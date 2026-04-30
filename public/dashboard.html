@@ -83,10 +83,11 @@
       </div>
 
       <div class="card">
-        <h3 style="margin:0 0 16px">Generate Today's Data</h3>
-        <p style="margin:0 0 16px; color: var(--muted); font-size:13px">
-          Fetches Close and ATP (VWAP) from Angel One for all symbols, calculates 2DATP–20DATP as rolling averages of last N ATPs, then fills today's pre-populated row in each sheet.
+        <h3 style="margin:0 0 16px">Generate Data</h3>
+        <p style="margin:0 0 12px; color: var(--muted); font-size:13px">
+          Auto-detects the target trading date based on IST market hours. Backfills up to 5 missing trading days per sheet. Fills Close, ATP (VWAP), and 2DATP–20DATP rolling averages.
         </p>
+        <div id="targetInfo" style="margin: 0 0 16px; padding: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;"></div>
         <div class="btn-row">
           <button id="generateBtn" type="button">Generate Sheet</button>
           <button id="downloadBtn" class="ok" type="button">Download XLSX</button>
@@ -176,23 +177,34 @@
           if (handle401(res)) return;
           const json = await res.json();
           if (!json.ok) return;
-          renderSummary(json.data);
+          renderTargetInfo(json);
+          renderSummary(json.data, json.targetDate);
         } catch {}
       }
 
-      function renderSummary(data) {
+      function renderTargetInfo(meta) {
+        const targetInfo = document.getElementById("targetInfo");
+        targetInfo.innerHTML =
+          '<b>Target date:</b> ' + escHtml(meta.targetDate) +
+          ' <span style="color: var(--muted)">(' + escHtml(meta.targetReason) + ')</span>' +
+          (meta.marketSettled
+            ? ' &nbsp;·&nbsp; <span style="color: var(--ok)">Market closed</span>'
+            : ' &nbsp;·&nbsp; <span style="color: var(--warn)">Market open / pre-close</span>');
+      }
+
+      function renderSummary(data, targetDate) {
         if (!data || data.length === 0) {
           tableWrap.innerHTML = '<p class="empty">No sheets found.</p>';
           return;
         }
 
-        const today = new Date().toISOString().split("T")[0];
+        const cmp = targetDate || new Date().toISOString().split("T")[0];
         const totalSheets = data.length;
-        const upToDate = data.filter(d => d.lastDate === today).length;
+        const upToDate = data.filter(d => d.lastDate === cmp).length;
 
         infoRow.innerHTML =
           '<span>Total sheets: <b>' + totalSheets + '</b></span>' +
-          '<span>Up to date: <b>' + upToDate + '/' + totalSheets + '</b></span>';
+          '<span>Up to target (' + cmp + '): <b>' + upToDate + '/' + totalSheets + '</b></span>';
 
         let html = '<table><thead><tr>' +
           '<th>#</th><th>Sheet</th><th>Last Date</th><th>Close</th><th>ATP</th><th>Rows</th><th>Status</th>' +
@@ -200,8 +212,8 @@
 
         for (let i = 0; i < data.length; i++) {
           const d = data[i];
-          const isToday = d.lastDate === today;
-          const badge = isToday
+          const isUpToDate = d.lastDate === cmp;
+          const badge = isUpToDate
             ? '<span class="badge today">FILLED</span>'
             : '<span class="badge stale">PENDING</span>';
           html += '<tr>' +
@@ -241,23 +253,24 @@
 
           if (!json.ok) throw new Error(json.error || "Failed to generate");
 
-          let msg = '<b>Sheet updated for ' + escHtml(json.date) + '</b><br>';
-          msg += 'Updated: ' + json.updatedSheets.length + ' sheets';
+          // updatedSheets is [{ sheet, dates: [...] }]
+          const updated = json.updatedSheets || [];
+          const totalCells = updated.reduce((a, u) => a + (u.dates ? u.dates.length : 0), 0);
+          let msg = '<b>Generated for ' + escHtml(json.targetDate) + '</b>';
+          if (json.targetReason) msg += ' <span style="color:var(--muted)">(' + escHtml(json.targetReason) + ')</span>';
+          msg += '<br>';
+          msg += 'Updated: <b>' + updated.length + '</b> sheets, <b>' + totalCells + '</b> day-rows filled';
           if (json.alreadyFilled && json.alreadyFilled.length > 0) {
-            msg += ' | Already filled: ' + json.alreadyFilled.length;
+            msg += ' &nbsp;·&nbsp; Already up-to-date: ' + json.alreadyFilled.length;
           }
           if (json.skippedSheets && json.skippedSheets.length > 0) {
-            msg += ' | Skipped (no quote): ' + json.skippedSheets.length;
+            msg += ' &nbsp;·&nbsp; Skipped: ' + json.skippedSheets.length;
           }
-          if (json.noRowForDate && json.noRowForDate.length > 0) {
-            msg += ' | No date row: ' + json.noRowForDate.length;
+          if (json.missingData && json.missingData.length > 0) {
+            msg += ' &nbsp;·&nbsp; Missing: ' + json.missingData.length;
           }
-          if (json.warning) {
-            msg = '<b>' + escHtml(json.warning) + '</b>';
-            setStatus("warn", msg);
-          } else {
-            setStatus("ok", msg);
-          }
+          if (json.message) msg = '<b>' + escHtml(json.message) + '</b>';
+          setStatus("ok", msg);
 
           // Refresh summary
           await loadSummary();

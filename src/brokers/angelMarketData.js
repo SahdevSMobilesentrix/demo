@@ -7,6 +7,9 @@ import axios from "axios";
 const QUOTE_URL =
   "https://apiconnect.angelone.in/rest/secure/angelbroking/market/v1/quote/";
 
+const CANDLE_URL =
+  "https://apiconnect.angelone.in/rest/secure/angelbroking/historical/v1/getCandleData";
+
 // Angel One instrument master — maps tradingsymbol to token
 const INSTRUMENT_URL =
   "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json";
@@ -78,6 +81,23 @@ export function resolveToken(instruments, tradingSymbol) {
   // Fallback: try without -EQ suffix
   const key2 = `NSE:${tradingSymbol}`;
   if (instruments.has(key2)) return instruments.get(key2);
+
+  // Fallback: scan NSE EQ instruments for symbol or name match. Some Angel One
+  // entries use "-BE" or "-BL" suffixes, or include the underlying symbol in
+  // the `name` field rather than `symbol`.
+  const upper = tradingSymbol.toUpperCase();
+  let bestEq = null;
+  for (const [, inst] of instruments) {
+    if (inst.exchange !== "NSE") continue;
+    if (inst.instrumentType && inst.instrumentType !== "" && inst.instrumentType !== "AMXIDX") continue;
+    // Match on name (most reliable for cash equities)
+    if (inst.name && inst.name.toUpperCase() === upper) {
+      // Prefer -EQ symbol, else first match
+      if (inst.symbol && inst.symbol.toUpperCase().endsWith("-EQ")) return inst;
+      if (!bestEq) bestEq = inst;
+    }
+  }
+  if (bestEq) return bestEq;
 
   return null;
 }
@@ -161,4 +181,72 @@ export async function fetchQuotes(jwtToken, apiKey, tokens) {
   }
 
   return result;
+}
+
+/**
+ * Fetch daily OHLC candles for one symbol over a date range.
+ *
+ * Angel One historical API does NOT return VWAP / avgPrice — only OHLCV.
+ * Caller must approximate ATP from OHLC (e.g. (O+H+L+C)/4).
+ *
+ * @param {string} jwtToken
+ * @param {string} apiKey
+ * @param {{exchange: string, token: string}} instrument
+ * @param {Date} fromDate — date-only Date (midnight UTC)
+ * @param {Date} toDate   — date-only Date (midnight UTC)
+ * @returns {Array<{date: string, open: number, high: number, low: number, close: number, volume: number}>}
+ */
+export async function fetchHistoricalDaily(jwtToken, apiKey, instrument, fromDate, toDate) {
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "X-UserType": "USER",
+    "X-SourceID": "WEB",
+    "X-ClientLocalIP": "127.0.0.1",
+    "X-ClientPublicIP": "127.0.0.1",
+    "X-MACAddress": "00:00:00:00:00:00",
+    "X-PrivateKey": apiKey,
+    Authorization: `Bearer ${jwtToken}`,
+  };
+
+  const fmt = (d) =>
+    `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
+      d.getUTCDate()
+    ).padStart(2, "0")}`;
+
+  // Angel One historical API can be inclusive/exclusive on boundary depending
+  // on time-of-day. Using 00:00 from-time and 23:59 to-time guarantees both
+  // endpoint days are returned.
+  const body = {
+    exchange: instrument.exchange,
+    symboltoken: instrument.token,
+    interval: "ONE_DAY",
+    fromdate: `${fmt(fromDate)} 00:00`,
+    todate: `${fmt(toDate)} 23:59`,
+  };
+
+  const { data } = await axios.post(CANDLE_URL, body, {
+    headers,
+    timeout: 15000,
+    validateStatus: () => true,
+  });
+
+  if (!data || data.status === false) {
+    const msg = data?.message || data?.errorcode || "candle fetch failed";
+    const err = new Error(msg);
+    err.raw = data;
+    throw err;
+  }
+
+  // Response: data.data is array of [timestamp, open, high, low, close, volume]
+  const rows = (data.data || []).map((r) => ({
+    date: r[0].slice(0, 10), // "2026-04-29T..." → "2026-04-29"
+    open: parseFloat(r[1]),
+    high: parseFloat(r[2]),
+    low: parseFloat(r[3]),
+    close: parseFloat(r[4]),
+    volume: parseFloat(r[5]),
+  }));
+
+  return rows;
 }

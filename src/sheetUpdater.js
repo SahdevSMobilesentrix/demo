@@ -1,28 +1,41 @@
 // XLSX updater for WEEKLY.xlsx.
 //
-// Sheet layout (verified against existing data):
-//   A: DATE (Excel serial — pre-populated for future days)
+// Sheet layout (verified):
+//   A: DATE (Excel serial — pre-populated for future days, including weekends)
 //   B: Close/LTP price
-//   C: ATP (VWAP / avgPrice from Angel One — exchange-published Average Traded Price)
-//   D: 2DATP  = average of last 2  ATPs (today + yesterday)
-//   E: 3DATP  = average of last 3  ATPs
-//   …
-//   V: 20DATP = average of last 20 ATPs
-//   W onwards (e.g. SIGNAL, DAY, TRADE on RELIANCE) — left untouched
+//   C: ATP (VWAP from exchange — exact for today; approximated as (O+H+L+C)/4 for historical backfill)
+//   D..V: 2DATP..20DATP — average of last N filled ATPs (chained)
+//   W onwards (e.g. SIGNAL/DAY/TRADE) — left untouched.
 //
-// Workflow: find the row whose DATE matches today, fill columns B..V.
-// Future date rows are already pre-populated in the file.
+// Workflow:
+//   1. Determine target date (today after market close, or previous trading day).
+//   2. For each sheet, find missing trading dates between (lastFilled+1, target).
+//   3. Cap missing range to last 5 trading days (else only fill target).
+//   4. Fill rows chronologically — each day's ATP feeds into the next day's nDATP.
 
 import XLSX from "xlsx";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  dateToSerial,
+  serialToDate,
+  fmtISO,
+  tradingDaysBetween,
+  isTradingDay,
+} from "./dateUtils.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "..", "data");
 const XLSX_PATH = path.join(DATA_DIR, "WEEKLY.xlsx");
 
-function loadOverrides() {
+const MAX_BACKFILL_DAYS = 5;
+
+export function getXlsxPath() {
+  return XLSX_PATH;
+}
+
+export function loadOverrides() {
   const overridePath = path.join(DATA_DIR, "symbol_overrides.json");
   if (fs.existsSync(overridePath)) {
     return JSON.parse(fs.readFileSync(overridePath, "utf8"));
@@ -30,176 +43,245 @@ function loadOverrides() {
   return {};
 }
 
-function dateToSerial(d) {
-  const epoch = new Date(Date.UTC(1899, 11, 30));
-  const diff = d.getTime() - epoch.getTime();
-  return Math.floor(diff / (24 * 60 * 60 * 1000));
-}
-
-function serialToDate(serial) {
-  return new Date((serial - 25569) * 86400 * 1000);
-}
-
-function todayIST() {
-  const now = new Date();
-  const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
-  return new Date(
-    Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate())
-  );
-}
-
-function isWeekend(d) {
-  const dow = d.getUTCDay();
-  return dow === 0 || dow === 6;
-}
-
-/**
- * Calculate nDATP: average of the last N ATP values (including today's).
- * Walks back through filled ATP cells, skipping empty (e.g. weekend) rows.
- */
-function calcNDayAtp(atpHistory, n) {
-  if (atpHistory.length < n) return null;
-  const slice = atpHistory.slice(-n);
-  const sum = slice.reduce((a, b) => a + b, 0);
-  return sum / n;
-}
-
-/**
- * Update WEEKLY.xlsx by filling today's row in each sheet.
- *
- * @param {Object} quotes — map of tradingSymbol -> { ltp, close, avgPrice }
- * @param {Date} [forDate] — date to fill (defaults to today IST)
- */
-export function updateXlsx(quotes, forDate) {
-  const targetDate = forDate || todayIST();
-  const targetSerial = dateToSerial(targetDate);
-  const dateStr = targetDate.toISOString().split("T")[0];
-
-  if (isWeekend(targetDate)) {
-    return {
-      updatedSheets: [],
-      skippedSheets: [],
-      alreadyFilled: [],
-      noRowForDate: [],
-      date: dateStr,
-      warning: "Today is a weekend — nothing to fill.",
-    };
+/** Resolve a sheet name to its Angel One trading symbol. Returns null if sheet should be skipped. */
+export function resolveSheetSymbol(sheetName, overrides) {
+  if (sheetName in overrides) {
+    return overrides[sheetName]; // may be null (skip) or a string
   }
+  return sheetName;
+}
 
-  const overrides = loadOverrides();
+/**
+ * For each sheet, compute:
+ *   - lastFilledDate (most recent row with a Close value)
+ *   - missingDates (trading days between lastFilled+1 and targetDate, inclusive of target)
+ *   - cappedDates  (missingDates if length <= MAX_BACKFILL_DAYS, else just [targetDate])
+ *
+ * Returns an array of plan entries, one per sheet.
+ */
+export function planUpdates(targetDate) {
   const wb = XLSX.readFile(XLSX_PATH);
-
-  const updatedSheets = [];
-  const skippedSheets = [];
-  const alreadyFilled = [];
-  const noRowForDate = [];
+  const overrides = loadOverrides();
+  const targetSerial = dateToSerial(targetDate);
+  const plans = [];
 
   for (const sheetName of wb.SheetNames) {
-    let tradingSymbol;
-    if (sheetName in overrides) {
-      if (overrides[sheetName] === null) {
-        skippedSheets.push(sheetName);
-        continue;
-      }
-      tradingSymbol = overrides[sheetName];
-    } else {
-      tradingSymbol = sheetName;
-    }
-
-    const quote = quotes[tradingSymbol];
-    if (!quote) {
-      skippedSheets.push(sheetName);
-      continue;
-    }
-    if (quote.avgPrice == null || isNaN(quote.avgPrice)) {
-      skippedSheets.push(sheetName);
+    const tradingSymbol = resolveSheetSymbol(sheetName, overrides);
+    if (tradingSymbol === null) {
+      plans.push({ sheetName, tradingSymbol: null, status: "skipped-override" });
       continue;
     }
 
     const ws = wb.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-    // Find the row matching today's date in column A
-    let targetRow = -1;
+    // Find last filled row (has Close in col B)
+    let lastFilledRow = -1;
+    let lastFilledDate = null;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][0] === targetSerial) {
-        targetRow = i;
-        break;
+      const hasDate = typeof data[i][0] === "number";
+      const hasClose =
+        data[i][1] !== "" && data[i][1] !== undefined && data[i][1] !== null;
+      if (hasDate && hasClose) {
+        lastFilledRow = i;
+        lastFilledDate = serialToDate(data[i][0]);
       }
     }
 
-    if (targetRow === -1) {
-      noRowForDate.push(sheetName);
-      continue;
-    }
-
-    // If today's row is already filled (has close), mark as alreadyFilled
-    if (
-      data[targetRow][1] !== "" &&
-      data[targetRow][1] !== undefined &&
-      data[targetRow][1] !== null
-    ) {
-      alreadyFilled.push(sheetName);
-      continue;
-    }
-
-    // Build ATP history from rows BEFORE today that have a numeric ATP
-    const atpHistory = [];
-    for (let i = 1; i < targetRow; i++) {
-      const atp = data[i][2];
-      if (typeof atp === "number" && !isNaN(atp)) {
-        atpHistory.push(atp);
-      }
-    }
-
-    const closePrice = quote.close || quote.ltp;
-    const todayAtp = quote.avgPrice;
-    atpHistory.push(todayAtp);
-
-    // Build values for cols B..V (indexes 1..21)
-    const values = {
-      1: closePrice, // B: Close
-      2: todayAtp,   // C: ATP
-    };
-    // D..V = 2DATP..20DATP
-    for (let n = 2; n <= 20; n++) {
-      const ndatp = calcNDayAtp(atpHistory, n);
-      const colIdx = n + 1; // 2DATP at index 3 (col D), 20DATP at index 21 (col V)
-      values[colIdx] = ndatp;
-    }
-
-    // Write cells
-    for (const [colStr, val] of Object.entries(values)) {
-      const col = parseInt(colStr, 10);
-      const cellRef = XLSX.utils.encode_cell({ r: targetRow, c: col });
-      if (val == null || isNaN(val)) {
-        delete ws[cellRef];
+    // Determine date range to fill
+    let datesToFill;
+    if (lastFilledDate === null) {
+      // No filled rows yet — only fill target
+      datesToFill = [targetDate];
+    } else if (lastFilledDate.getTime() >= targetDate.getTime()) {
+      // Already up-to-date or ahead
+      datesToFill = [];
+    } else {
+      const fromDate = new Date(lastFilledDate.getTime());
+      fromDate.setUTCDate(fromDate.getUTCDate() + 1);
+      const allMissing = tradingDaysBetween(fromDate, targetDate);
+      if (allMissing.length > MAX_BACKFILL_DAYS) {
+        // Gap too large — only fill the target date
+        datesToFill = [targetDate];
       } else {
-        ws[cellRef] = { t: "n", v: val };
+        datesToFill = allMissing;
       }
     }
 
-    updatedSheets.push(sheetName);
+    // Verify each date has a corresponding row in the sheet (column A)
+    const dateRows = []; // { date, rowIndex }
+    for (const d of datesToFill) {
+      const serial = dateToSerial(d);
+      let rowIndex = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === serial) {
+          rowIndex = i;
+          break;
+        }
+      }
+      dateRows.push({ date: d, serial, rowIndex });
+    }
+
+    plans.push({
+      sheetName,
+      tradingSymbol,
+      lastFilledDate: lastFilledDate ? fmtISO(lastFilledDate) : null,
+      lastFilledRow,
+      datesToFill: dateRows,
+      status: "planned",
+    });
+  }
+
+  return { plans, targetDate, targetSerial };
+}
+
+/**
+ * Apply updates to the XLSX. Processes each sheet's missing dates chronologically
+ * so that nDATP rolling averages chain correctly (today's ATP feeds tomorrow's 2DATP).
+ *
+ * @param {Array} plans — output of planUpdates
+ * @param {Object} dataBySymbolDate — { [tradingSymbol]: { [YYYY-MM-DD]: { close, atp } } }
+ * @returns {{ updatedSheets, alreadyFilled, skippedSheets, missingData, targetDate }}
+ */
+export function applyUpdates(plans, dataBySymbolDate, targetDate) {
+  const wb = XLSX.readFile(XLSX_PATH);
+
+  const updatedSheets = []; // { sheet, datesFilled }
+  const alreadyFilled = []; // sheets fully up-to-date
+  const skippedSheets = []; // { sheet, reason }
+  const missingData = []; // { sheet, date, reason }
+
+  for (const plan of plans) {
+    if (plan.status === "skipped-override" || plan.tradingSymbol === null) {
+      skippedSheets.push({ sheet: plan.sheetName, reason: "override-skip" });
+      continue;
+    }
+
+    if (plan.datesToFill.length === 0) {
+      alreadyFilled.push(plan.sheetName);
+      continue;
+    }
+
+    const ws = wb.Sheets[plan.sheetName];
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+    const symData = dataBySymbolDate[plan.tradingSymbol] || {};
+    const datesFilled = [];
+
+    // Process chronologically — already in order from tradingDaysBetween()
+    for (const { date, serial, rowIndex } of plan.datesToFill) {
+      const isoDate = fmtISO(date);
+
+      if (rowIndex === -1) {
+        missingData.push({
+          sheet: plan.sheetName,
+          date: isoDate,
+          reason: "no row in sheet for this date",
+        });
+        continue;
+      }
+
+      // Skip non-trading days (paranoia — should never happen since planner filters)
+      if (!isTradingDay(date)) continue;
+
+      // If row already has close, skip it
+      const existingClose = data[rowIndex][1];
+      if (
+        existingClose !== "" &&
+        existingClose !== undefined &&
+        existingClose !== null
+      ) {
+        continue;
+      }
+
+      const dayData = symData[isoDate];
+      if (!dayData || dayData.close == null || dayData.atp == null) {
+        missingData.push({
+          sheet: plan.sheetName,
+          date: isoDate,
+          reason: "no quote data returned",
+        });
+        continue;
+      }
+
+      // Build ATP history from rows BEFORE this rowIndex with numeric ATP
+      const atpHistory = [];
+      for (let i = 1; i < rowIndex; i++) {
+        const atp = data[i][2];
+        if (typeof atp === "number" && !isNaN(atp)) {
+          atpHistory.push(atp);
+        }
+      }
+      atpHistory.push(dayData.atp);
+
+      // Write Close (col B), ATP (col C)
+      writeCell(ws, rowIndex, 1, dayData.close);
+      writeCell(ws, rowIndex, 2, dayData.atp);
+
+      // Update in-memory data array so later iterations see the new ATP
+      data[rowIndex][1] = dayData.close;
+      data[rowIndex][2] = dayData.atp;
+
+      // Compute and write 2DATP..20DATP (cols D..V, indexes 3..21)
+      for (let n = 2; n <= 20; n++) {
+        const colIdx = n + 1;
+        if (atpHistory.length < n) {
+          // Not enough history — leave blank
+          deleteCell(ws, rowIndex, colIdx);
+          data[rowIndex][colIdx] = "";
+        } else {
+          const slice = atpHistory.slice(-n);
+          const avg = slice.reduce((a, b) => a + b, 0) / n;
+          writeCell(ws, rowIndex, colIdx, avg);
+          data[rowIndex][colIdx] = avg;
+        }
+      }
+
+      datesFilled.push(isoDate);
+    }
+
+    if (datesFilled.length > 0) {
+      updatedSheets.push({ sheet: plan.sheetName, dates: datesFilled });
+    } else {
+      // Had datesToFill but couldn't fill any
+      skippedSheets.push({
+        sheet: plan.sheetName,
+        reason: "no data for any planned date",
+      });
+    }
   }
 
   XLSX.writeFile(wb, XLSX_PATH);
 
   return {
     updatedSheets,
-    skippedSheets,
     alreadyFilled,
-    noRowForDate,
-    date: dateStr,
+    skippedSheets,
+    missingData,
+    targetDate: fmtISO(targetDate),
   };
 }
 
-export function getXlsxPath() {
-  return XLSX_PATH;
+function writeCell(ws, row, col, value) {
+  if (value == null || isNaN(value)) {
+    deleteCell(ws, row, col);
+    return;
+  }
+  const ref = XLSX.utils.encode_cell({ r: row, c: col });
+  ws[ref] = { t: "n", v: value };
+  // Extend range if needed
+  const range = XLSX.utils.decode_range(ws["!ref"]);
+  if (row > range.e.r) range.e.r = row;
+  if (col > range.e.c) range.e.c = col;
+  ws["!ref"] = XLSX.utils.encode_range(range);
 }
 
-/**
- * Per-sheet summary: last filled date + values, total filled rows.
- */
+function deleteCell(ws, row, col) {
+  const ref = XLSX.utils.encode_cell({ r: row, c: col });
+  delete ws[ref];
+}
+
+/** Per-sheet summary for the dashboard. */
 export function getSheetSummary() {
   const wb = XLSX.readFile(XLSX_PATH);
   const summary = [];
@@ -208,12 +290,12 @@ export function getSheetSummary() {
     const ws = wb.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-    // Find last row with both DATE and Close filled
     let lastFilled = -1;
     let filledCount = 0;
     for (let i = 1; i < data.length; i++) {
-      const hasDate = data[i][0] !== "" && data[i][0] !== undefined;
-      const hasClose = data[i][1] !== "" && data[i][1] !== undefined;
+      const hasDate = typeof data[i][0] === "number";
+      const hasClose =
+        data[i][1] !== "" && data[i][1] !== undefined && data[i][1] !== null;
       if (hasDate && hasClose) {
         lastFilled = i;
         filledCount++;
@@ -226,14 +308,9 @@ export function getSheetSummary() {
     }
 
     const lastSerial = data[lastFilled][0];
-    const lastDate =
-      typeof lastSerial === "number"
-        ? serialToDate(lastSerial).toISOString().split("T")[0]
-        : null;
-
     summary.push({
       sheet: sheetName,
-      lastDate,
+      lastDate: fmtISO(serialToDate(lastSerial)),
       lastClose: data[lastFilled][1],
       lastAtp: data[lastFilled][2],
       rows: filledCount,

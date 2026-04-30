@@ -1,4 +1,4 @@
-// Express server for Angel One login + WEEKLY_FNO sheet management.
+// Express server for Angel One login + WEEKLY.xlsx generation.
 
 import "dotenv/config";
 import express from "express";
@@ -10,12 +10,21 @@ import {
   loadInstruments,
   resolveToken,
   fetchQuotes,
+  fetchHistoricalDaily,
 } from "./brokers/angelMarketData.js";
 import {
-  updateXlsx,
+  planUpdates,
+  applyUpdates,
   getXlsxPath,
   getSheetSummary,
 } from "./sheetUpdater.js";
+import {
+  resolveTargetDate,
+  fmtISO,
+  todayDateIST,
+  isAfterMarketSettle,
+  nowIST,
+} from "./dateUtils.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const log = pino({ level: process.env.LOG_LEVEL || "info" });
@@ -26,7 +35,6 @@ app.use(express.static(path.join(__dirname, "..", "public")));
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// Prefill the form from .env so the user only has to type the TOTP.
 app.get("/api/angel/defaults", (_req, res) => {
   res.json({
     apiKey: process.env.ANGEL_API_KEY || "",
@@ -47,11 +55,12 @@ app.post("/api/angel/login", async (req, res) => {
     res.json({ ok: true, ...out });
   } catch (err) {
     log.warn({ err: err.message }, "angel login failed");
-    res.status(401).json({ ok: false, error: err.message, raw: err.raw || null });
+    res
+      .status(401)
+      .json({ ok: false, error: err.message, raw: err.raw || null });
   }
 });
 
-// Auth middleware — checks JWT expiry
 function authMiddleware(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith("Bearer ")) {
@@ -66,7 +75,6 @@ function authMiddleware(req, res, next) {
       return res.status(401).json({ ok: false, error: "Token expired" });
     }
     req.jwtToken = token;
-    req.tokenPayload = payload;
     next();
   } catch {
     return res.status(401).json({ ok: false, error: "Invalid token" });
@@ -75,18 +83,35 @@ function authMiddleware(req, res, next) {
 
 // ---------- Sheet endpoints ----------
 
-// GET /api/angel/summary — returns per-sheet last date, close, ATP
 app.get("/api/angel/summary", authMiddleware, async (_req, res) => {
   try {
     const summary = getSheetSummary();
-    res.json({ ok: true, data: summary });
+    const target = resolveTargetDate();
+    res.json({
+      ok: true,
+      data: summary,
+      targetDate: fmtISO(target.target),
+      targetReason: target.reason,
+      isToday: target.isToday,
+      marketSettled: isAfterMarketSettle(),
+    });
   } catch (err) {
     log.warn({ err: err.message }, "summary failed");
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-// POST /api/angel/generate — fetch quotes, calculate ATP, update XLSX
+/**
+ * Generate today/backfill data and update WEEKLY.xlsx.
+ *
+ * Logic:
+ *   1. Resolve targetDate (today after market close, else previous trading day).
+ *   2. For each sheet, plan missing trading dates (capped to last 5).
+ *   3. Group dates per symbol — fetch all needed data:
+ *      - Today's data (target == today): FULL quote API → exact ATP (avgPrice)
+ *      - Past dates: historical candle API → ATP ≈ (O+H+L+C)/4
+ *   4. Apply updates chronologically so nDATP rolling averages chain correctly.
+ */
 app.post("/api/angel/generate", authMiddleware, async (req, res) => {
   const apiKey = req.body.apiKey || process.env.ANGEL_API_KEY;
   if (!apiKey) {
@@ -94,68 +119,174 @@ app.post("/api/angel/generate", authMiddleware, async (req, res) => {
   }
 
   try {
-    log.info("loading instrument master...");
+    // Step 1 — resolve target date
+    const targetInfo = resolveTargetDate();
+    const targetDate = targetInfo.target;
+    const todayDate = todayDateIST();
+    const targetIsToday = targetDate.getTime() === todayDate.getTime();
+
+    log.info(
+      {
+        target: fmtISO(targetDate),
+        isToday: targetIsToday,
+        reason: targetInfo.reason,
+      },
+      "target date resolved"
+    );
+
+    // Step 2 — plan per-sheet
+    const { plans } = planUpdates(targetDate);
+
+    // Collect unique (symbol, dates) pairs
+    const symbolToDates = new Map(); // tradingSymbol -> Set<isoDate>
+    for (const p of plans) {
+      if (!p.tradingSymbol || p.datesToFill.length === 0) continue;
+      if (!symbolToDates.has(p.tradingSymbol)) {
+        symbolToDates.set(p.tradingSymbol, new Set());
+      }
+      const set = symbolToDates.get(p.tradingSymbol);
+      for (const { date } of p.datesToFill) set.add(fmtISO(date));
+    }
+
+    if (symbolToDates.size === 0) {
+      return res.json({
+        ok: true,
+        targetDate: fmtISO(targetDate),
+        targetReason: targetInfo.reason,
+        updatedSheets: [],
+        alreadyFilled: plans.filter(p => p.datesToFill && p.datesToFill.length === 0).map(p => p.sheetName),
+        skippedSheets: [],
+        missingData: [],
+        message: "All sheets already up-to-date.",
+      });
+    }
+
+    // Step 3 — load instrument master, resolve tokens
+    log.info("loading Angel One instrument master...");
     const instruments = await loadInstruments();
 
-    // Read the sheet summary to know which symbols we need
-    const summary = getSheetSummary();
-    const overrides = (
-      await import("fs")
-    ).default.existsSync(
-      path.join(__dirname, "..", "data", "symbol_overrides.json")
-    )
-      ? JSON.parse(
-          (await import("fs")).default.readFileSync(
-            path.join(__dirname, "..", "data", "symbol_overrides.json"),
-            "utf8"
-          )
-        )
-      : {};
+    const symbolInstruments = {}; // tradingSymbol -> { exchange, token }
+    const unresolved = [];
+    for (const sym of symbolToDates.keys()) {
+      const inst = resolveToken(instruments, sym);
+      if (inst) symbolInstruments[sym] = inst;
+      else unresolved.push(sym);
+    }
+    if (unresolved.length) log.warn({ unresolved }, "tokens unresolved");
 
-    // Resolve all symbols to Angel One tokens
-    const tokenList = [];
-    const symbolMap = {}; // sheetName -> tradingSymbol
+    // Step 4 — fetch data
+    // dataBySymbolDate: { tradingSymbol: { 'YYYY-MM-DD': { close, atp } } }
+    const dataBySymbolDate = {};
+    const todayISO = fmtISO(todayDate);
 
-    for (const s of summary) {
-      let tradingSymbol;
-      if (s.sheet in overrides) {
-        if (overrides[s.sheet] === null) continue;
-        tradingSymbol = overrides[s.sheet];
-      } else {
-        tradingSymbol = s.sheet;
-      }
-      symbolMap[s.sheet] = tradingSymbol;
+    // 4a — Today's data via FULL quote (exact VWAP), only when target is today
+    const symbolsNeedingToday = [];
+    for (const [sym, dates] of symbolToDates) {
+      if (dates.has(todayISO) && targetIsToday) symbolsNeedingToday.push(sym);
+    }
+    // Track which symbols still need today's data (e.g. indices where avgPrice
+    // is 0 / unavailable from the quote API — fallback to historical below).
+    const symbolsNeedingTodayHistorical = new Set();
 
-      const inst = resolveToken(instruments, tradingSymbol);
-      if (inst) {
-        tokenList.push({
-          exchange: inst.exchange,
-          token: inst.token,
-          symbol: tradingSymbol,
-        });
-      } else {
-        log.warn({ tradingSymbol, sheet: s.sheet }, "could not resolve token");
+    if (symbolsNeedingToday.length > 0) {
+      const tokens = symbolsNeedingToday
+        .filter((s) => symbolInstruments[s])
+        .map((s) => ({
+          exchange: symbolInstruments[s].exchange,
+          token: symbolInstruments[s].token,
+          symbol: s,
+        }));
+      log.info({ count: tokens.length }, "fetching today's quotes (FULL mode)");
+      const quotes = await fetchQuotes(req.jwtToken, apiKey, tokens);
+      for (const sym of symbolsNeedingToday) {
+        const q = quotes[sym];
+        // Use LTP as today's Close — Angel One's q.close is the PREVIOUS day's
+        // close (verified empirically: q.close on 2026-04-30 returned 04-29's close).
+        const closeVal = q && (q.ltp ?? q.close);
+        // For indices, q.avgPrice comes back as 0 (not null) — treat <= 0 as
+        // unavailable so we fall back to historical OHLC.
+        const validAtp =
+          q && q.avgPrice != null && !isNaN(q.avgPrice) && q.avgPrice > 0;
+        if (!q || !closeVal || !validAtp) {
+          // Fall back to historical candle for today's data
+          symbolsNeedingTodayHistorical.add(sym);
+          continue;
+        }
+        if (!dataBySymbolDate[sym]) dataBySymbolDate[sym] = {};
+        dataBySymbolDate[sym][todayISO] = {
+          close: closeVal,
+          atp: q.avgPrice,
+        };
       }
     }
 
-    log.info({ count: tokenList.length }, "fetching quotes from Angel One...");
-    const quotes = await fetchQuotes(req.jwtToken, apiKey, tokenList);
-    log.info(
-      { fetched: Object.keys(quotes).length },
-      "quotes fetched, updating XLSX..."
-    );
+    // 4b — Historical data via candle API (ATP approximated as (O+H+L+C)/4).
+    // For each symbol: include past dates ALWAYS, plus today if quote API
+    // didn't supply a usable avgPrice (indices fall here).
+    for (const [sym, datesSet] of symbolToDates) {
+      const dates = [...datesSet].filter((d) => {
+        if (d !== todayISO) return true; // past dates always
+        // Today: include if it wasn't satisfied by quote API
+        return symbolsNeedingTodayHistorical.has(sym) || !targetIsToday;
+      });
+      if (dates.length === 0) continue;
+      const inst = symbolInstruments[sym];
+      if (!inst) continue;
 
-    const result = updateXlsx(quotes);
-    log.info(result, "XLSX updated");
+      const sortedDates = dates.sort();
+      const fromDate = new Date(sortedDates[0] + "T00:00:00Z");
+      const toDate = new Date(sortedDates[sortedDates.length - 1] + "T00:00:00Z");
 
-    res.json({ ok: true, ...result });
+      try {
+        const candles = await fetchHistoricalDaily(
+          req.jwtToken,
+          apiKey,
+          inst,
+          fromDate,
+          toDate
+        );
+        if (!dataBySymbolDate[sym]) dataBySymbolDate[sym] = {};
+        for (const c of candles) {
+          if (!datesSet.has(c.date)) continue;
+          // Don't overwrite a value already set from FULL quote (more accurate ATP)
+          if (dataBySymbolDate[sym][c.date]) continue;
+          // ATP ≈ (O+H+L+C) / 4 — historical proxy for VWAP since candle API
+          // doesn't return avgPrice
+          const atp = (c.open + c.high + c.low + c.close) / 4;
+          dataBySymbolDate[sym][c.date] = {
+            close: c.close,
+            atp: Math.round(atp * 100) / 100,
+          };
+        }
+      } catch (err) {
+        log.warn(
+          { sym, err: err.message },
+          "historical fetch failed for symbol"
+        );
+      }
+
+      // Rate-limit: small delay between historical calls
+      await new Promise((r) => setTimeout(r, 350));
+    }
+
+    // Step 5 — apply updates
+    log.info("applying XLSX updates...");
+    const result = applyUpdates(plans, dataBySymbolDate, targetDate);
+
+    res.json({
+      ok: true,
+      targetDate: fmtISO(targetDate),
+      targetReason: targetInfo.reason,
+      isToday: targetIsToday,
+      ...result,
+      unresolvedSymbols: unresolved,
+    });
   } catch (err) {
     log.error({ err: err.message, raw: err.raw }, "generate failed");
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-// GET /api/angel/download — download the WEEKLY_FNO.xlsx file
 app.get("/api/angel/download", authMiddleware, (_req, res) => {
   const xlsxPath = getXlsxPath();
   res.download(xlsxPath, "WEEKLY.xlsx", (err) => {
@@ -169,4 +300,6 @@ app.get("/api/angel/download", authMiddleware, (_req, res) => {
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => log.info({ port }, "angel-one server listening"));
+app.listen(port, () =>
+  log.info({ port, now: nowIST().toISOString() }, "angel-one server listening")
+);
