@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>WEEKLY FNO — Dashboard</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0f1115;
+        --panel: #181b22;
+        --panel-2: #20242d;
+        --border: #2a2f3a;
+        --text: #e6e8ee;
+        --muted: #8b93a7;
+        --accent: #4f8cff;
+        --ok: #21c07a;
+        --danger: #ff5d6c;
+        --warn: #f5a623;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f6f7fb; --panel: #fff; --panel-2: #f1f3f8;
+          --border: #d9dde7; --text: #1a1d24; --muted: #5c6478;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh;
+        font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        background: var(--bg); color: var(--text);
+      }
+      .wrap { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+      .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+      h1 { font-size: 24px; margin: 0; }
+      .card {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 14px; padding: 24px; margin-bottom: 20px;
+      }
+      button {
+        padding: 12px 18px; font-size: 15px; font-weight: 600;
+        border: 0; border-radius: 8px; cursor: pointer;
+        background: var(--accent); color: #fff;
+      }
+      button[disabled] { opacity: .55; cursor: not-allowed; }
+      button.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+      button.ok { background: var(--ok); }
+      button.danger { background: var(--danger); }
+      .btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+      .status {
+        margin-top: 16px; padding: 14px; border-radius: 10px; font-size: 14px;
+        background: var(--panel-2); border: 1px solid var(--border); display: none;
+      }
+      .status.show { display: block; }
+      .status.ok { border-color: rgba(33,192,122,.5); }
+      .status.err { border-color: rgba(255,93,108,.5); color: var(--danger); }
+      .status.warn { border-color: rgba(245,166,35,.5); color: var(--warn); }
+      .table-scroll { overflow-x: auto; }
+      table {
+        width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px;
+      }
+      th, td {
+        text-align: left; padding: 8px 10px; white-space: nowrap;
+        border-bottom: 1px solid var(--border);
+      }
+      th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; position: sticky; top: 0; background: var(--panel); }
+      td.num { text-align: right; font-family: ui-monospace, Menlo, monospace; }
+      .empty { color: var(--muted); text-align: center; padding: 40px; }
+      .badge {
+        display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+      }
+      .badge.today { background: rgba(33,192,122,.15); color: var(--ok); }
+      .badge.stale { background: rgba(255,93,108,.15); color: var(--danger); }
+      .info-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; font-size: 14px; color: var(--muted); }
+      .info-row b { color: var(--text); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <h1>WEEKLY Sheet</h1>
+        <button class="danger" id="logoutBtn" type="button">Logout</button>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 16px">Generate Today's Data</h3>
+        <p style="margin:0 0 16px; color: var(--muted); font-size:13px">
+          Fetches Close and ATP (VWAP) from Angel One for all symbols, calculates 2DATP–20DATP as rolling averages of last N ATPs, then fills today's pre-populated row in each sheet.
+        </p>
+        <div class="btn-row">
+          <button id="generateBtn" type="button">Generate Sheet</button>
+          <button id="downloadBtn" class="ok" type="button">Download XLSX</button>
+        </div>
+        <div id="status" class="status"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 4px">Sheet Summary</h3>
+        <p style="margin:0 0 8px; color:var(--muted); font-size:13px">Last filled date and values for each symbol sheet.</p>
+        <div id="infoRow" class="info-row"></div>
+        <div class="table-scroll">
+          <div id="tableWrap"><p class="empty">Loading summary...</p></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- Auth guard ---
+      function getToken() {
+        const token = localStorage.getItem("jwtToken");
+        if (!token) return null;
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          if (payload.exp && payload.exp * 1000 < Date.now()) {
+            clearAuth();
+            return null;
+          }
+          return token;
+        } catch {
+          return null;
+        }
+      }
+
+      function getApiKey() {
+        return localStorage.getItem("apiKey") || "";
+      }
+
+      function clearAuth() {
+        localStorage.removeItem("jwtToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("feedToken");
+        localStorage.removeItem("apiKey");
+      }
+
+      function authHeaders() {
+        return { Authorization: "Bearer " + getToken() };
+      }
+
+      function handle401(res) {
+        if (res.status === 401) { clearAuth(); window.location.href = "/index.html"; return true; }
+        return false;
+      }
+
+      if (!getToken()) {
+        window.location.href = "/index.html";
+      }
+
+      // --- Refs ---
+      const statusEl = document.getElementById("status");
+      const generateBtn = document.getElementById("generateBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const tableWrap = document.getElementById("tableWrap");
+      const infoRow = document.getElementById("infoRow");
+
+      function setStatus(kind, html) {
+        statusEl.className = "status show " + (kind || "");
+        statusEl.innerHTML = html;
+      }
+
+      function escHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      }
+
+      // --- Logout ---
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        clearAuth();
+        window.location.href = "/index.html";
+      });
+
+      // --- Load summary on page load ---
+      async function loadSummary() {
+        const token = getToken();
+        if (!token) return;
+        try {
+          const res = await fetch("/api/angel/summary", { headers: authHeaders() });
+          if (handle401(res)) return;
+          const json = await res.json();
+          if (!json.ok) return;
+          renderSummary(json.data);
+        } catch {}
+      }
+
+      function renderSummary(data) {
+        if (!data || data.length === 0) {
+          tableWrap.innerHTML = '<p class="empty">No sheets found.</p>';
+          return;
+        }
+
+        const today = new Date().toISOString().split("T")[0];
+        const totalSheets = data.length;
+        const upToDate = data.filter(d => d.lastDate === today).length;
+
+        infoRow.innerHTML =
+          '<span>Total sheets: <b>' + totalSheets + '</b></span>' +
+          '<span>Up to date: <b>' + upToDate + '/' + totalSheets + '</b></span>';
+
+        let html = '<table><thead><tr>' +
+          '<th>#</th><th>Sheet</th><th>Last Date</th><th>Close</th><th>ATP</th><th>Rows</th><th>Status</th>' +
+          '</tr></thead><tbody>';
+
+        for (let i = 0; i < data.length; i++) {
+          const d = data[i];
+          const isToday = d.lastDate === today;
+          const badge = isToday
+            ? '<span class="badge today">FILLED</span>'
+            : '<span class="badge stale">PENDING</span>';
+          html += '<tr>' +
+            '<td>' + (i+1) + '</td>' +
+            '<td><b>' + escHtml(d.sheet) + '</b></td>' +
+            '<td>' + (d.lastDate || '-') + '</td>' +
+            '<td class="num">' + (d.lastClose != null ? d.lastClose : '-') + '</td>' +
+            '<td class="num">' + (d.lastAtp != null ? d.lastAtp : '-') + '</td>' +
+            '<td class="num">' + d.rows + '</td>' +
+            '<td>' + badge + '</td>' +
+            '</tr>';
+        }
+        html += '</tbody></table>';
+        tableWrap.innerHTML = html;
+      }
+
+      loadSummary();
+
+      // --- Generate Sheet ---
+      generateBtn.addEventListener("click", async () => {
+        const token = getToken();
+        if (!token) { window.location.href = "/index.html"; return; }
+
+        generateBtn.disabled = true;
+        generateBtn.textContent = "Generating...";
+        setStatus("", "Loading instrument data and fetching quotes from Angel One... This may take 15-30 seconds.");
+
+        try {
+          const res = await fetch("/api/angel/generate", {
+            method: "POST",
+            headers: { ...authHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify({ apiKey: getApiKey() }),
+          });
+
+          if (handle401(res)) return;
+          const json = await res.json();
+
+          if (!json.ok) throw new Error(json.error || "Failed to generate");
+
+          let msg = '<b>Sheet updated for ' + escHtml(json.date) + '</b><br>';
+          msg += 'Updated: ' + json.updatedSheets.length + ' sheets';
+          if (json.alreadyFilled && json.alreadyFilled.length > 0) {
+            msg += ' | Already filled: ' + json.alreadyFilled.length;
+          }
+          if (json.skippedSheets && json.skippedSheets.length > 0) {
+            msg += ' | Skipped (no quote): ' + json.skippedSheets.length;
+          }
+          if (json.noRowForDate && json.noRowForDate.length > 0) {
+            msg += ' | No date row: ' + json.noRowForDate.length;
+          }
+          if (json.warning) {
+            msg = '<b>' + escHtml(json.warning) + '</b>';
+            setStatus("warn", msg);
+          } else {
+            setStatus("ok", msg);
+          }
+
+          // Refresh summary
+          await loadSummary();
+        } catch (err) {
+          setStatus("err", "Error: " + escHtml(err.message));
+        } finally {
+          generateBtn.disabled = false;
+          generateBtn.textContent = "Generate Sheet";
+        }
+      });
+
+      // --- Download XLSX ---
+      downloadBtn.addEventListener("click", async () => {
+        const token = getToken();
+        if (!token) { window.location.href = "/index.html"; return; }
+
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = "Downloading...";
+
+        try {
+          const res = await fetch("/api/angel/download", { headers: authHeaders() });
+          if (handle401(res)) return;
+
+          if (!res.ok) {
+            const json = await res.json().catch(() => ({}));
+            throw new Error(json.error || "Download failed");
+          }
+
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "WEEKLY.xlsx";
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          setStatus("err", "Download error: " + escHtml(err.message));
+        } finally {
+          downloadBtn.disabled = false;
+          downloadBtn.textContent = "Download XLSX";
+        }
+      });
+    </script>
+  </body>
+</html>

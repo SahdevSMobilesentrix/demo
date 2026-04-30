@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>WEEKLY F&amp;O — Daily Generator</title>
+    <title>Angel One — Login</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -14,273 +14,222 @@
         --text: #e6e8ee;
         --muted: #8b93a7;
         --accent: #4f8cff;
-        --accent-2: #1f7a3a;
-        --danger: #ff5d6c;
         --ok: #21c07a;
+        --danger: #ff5d6c;
       }
       @media (prefers-color-scheme: light) {
         :root {
-          --bg: #f6f7fb;
-          --panel: #ffffff;
-          --panel-2: #f1f3f8;
-          --border: #d9dde7;
-          --text: #1a1d24;
-          --muted: #5c6478;
+          --bg: #f6f7fb; --panel: #fff; --panel-2: #f1f3f8;
+          --border: #d9dde7; --text: #1a1d24; --muted: #5c6478;
         }
       }
       * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; }
       body {
+        margin: 0; min-height: 100vh;
         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-        background: var(--bg);
-        color: var(--text);
-        min-height: 100vh;
+        background: var(--bg); color: var(--text);
       }
-      .wrap {
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 32px 20px 80px;
-      }
-      header h1 {
-        font-size: 26px;
-        font-weight: 700;
-        margin: 0 0 6px;
-        letter-spacing: -0.01em;
-      }
-      header p { margin: 0; color: var(--muted); font-size: 14px; }
+      .wrap { max-width: 560px; margin: 0 auto; padding: 60px 20px; }
+      h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -.01em; }
+      header p { margin: 0; color: var(--muted); }
       .card {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 22px;
-        margin-top: 20px;
-        box-shadow: 0 1px 2px rgba(0,0,0,.04);
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 14px; padding: 24px; margin-top: 24px;
       }
-      label {
-        display: block;
-        font-size: 13px;
-        font-weight: 600;
-        margin-bottom: 6px;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: .04em;
-      }
-      input[type="password"], input[type="text"] {
-        width: 100%;
-        padding: 11px 13px;
-        font-size: 15px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--panel-2);
-        color: var(--text);
-        outline: none;
-        transition: border-color .15s, box-shadow .15s;
-      }
-      input:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(79,140,255,.15);
-      }
-      .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
       button {
-        flex: 1;
-        min-width: 140px;
-        padding: 12px 16px;
-        font-size: 15px;
-        font-weight: 600;
-        border: 0;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: transform .05s, opacity .15s, background .15s;
+        padding: 12px 18px; font-size: 15px; font-weight: 600;
+        border: 0; border-radius: 8px; cursor: pointer;
+        background: var(--accent); color: #fff;
       }
-      button:active { transform: translateY(1px); }
       button[disabled] { opacity: .55; cursor: not-allowed; }
-      .btn-primary { background: var(--accent); color: #fff; }
-      .btn-primary:hover:not([disabled]) { background: #3d7aef; }
-      .btn-success { background: var(--accent-2); color: #fff; }
-      .btn-success:hover:not([disabled]) { background: #186430; }
-      .btn-ghost {
-        background: transparent;
-        color: var(--text);
-        border: 1px solid var(--border);
+      button.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+
+      /* Modal */
+      .backdrop {
+        position: fixed; inset: 0; background: rgba(0,0,0,.55);
+        display: none; align-items: center; justify-content: center; z-index: 10;
       }
-      .btn-ghost:hover:not([disabled]) { background: var(--panel-2); }
+      .backdrop.show { display: flex; }
+      .modal {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 14px; padding: 26px; width: 100%; max-width: 420px;
+        box-shadow: 0 20px 50px rgba(0,0,0,.4);
+      }
+      .modal h2 { margin: 0 0 4px; font-size: 20px; }
+      .modal p.sub { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+      label {
+        display: block; font-size: 12px; font-weight: 600; margin: 12px 0 6px;
+        color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+      }
+      input {
+        width: 100%; padding: 11px 13px; font-size: 15px;
+        border: 1px solid var(--border); border-radius: 8px;
+        background: var(--panel-2); color: var(--text); outline: none;
+      }
+      input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,140,255,.15); }
+      input.totp {
+        font-size: 22px; letter-spacing: 8px; text-align: center;
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      .actions { display: flex; gap: 10px; margin-top: 20px; }
+      .actions button { flex: 1; }
 
       .status {
-        margin-top: 18px;
-        padding: 14px 16px;
-        border-radius: 10px;
-        font-size: 14px;
-        background: var(--panel-2);
-        border: 1px solid var(--border);
-        display: none;
+        margin-top: 18px; padding: 14px; border-radius: 10px; font-size: 14px;
+        background: var(--panel-2); border: 1px solid var(--border); display: none;
       }
       .status.show { display: block; }
-      .status.ok { border-color: rgba(33,192,122,.4); }
-      .status.err { border-color: rgba(255,93,108,.4); color: var(--danger); }
-      .status .label { font-weight: 600; margin-bottom: 4px; }
-
-      .stats {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 10px;
-        margin-top: 14px;
-      }
-      .stat {
-        padding: 10px 12px;
-        background: var(--panel-2);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-      }
-      .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-      .stat .v { font-size: 20px; font-weight: 700; margin-top: 2px; }
-
+      .status.ok { border-color: rgba(33,192,122,.5); }
+      .status.err { border-color: rgba(255,93,108,.5); color: var(--danger); }
       pre {
-        margin: 14px 0 0;
-        padding: 12px;
-        background: var(--panel-2);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
-        max-height: 240px;
-        overflow: auto;
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
-
-      .pulse {
-        display: inline-block;
-        width: 8px; height: 8px;
-        border-radius: 50%;
-        background: var(--accent);
-        margin-right: 6px;
-        animation: pulse 1s infinite;
-        vertical-align: middle;
-      }
-      @keyframes pulse {
-        0%,100% { opacity: 1; transform: scale(1); }
-        50% { opacity: .4; transform: scale(.7); }
-      }
-
-      footer {
-        margin-top: 30px;
-        font-size: 12px;
-        color: var(--muted);
-        text-align: center;
+        margin: 12px 0 0; padding: 12px; background: var(--panel-2);
+        border: 1px solid var(--border); border-radius: 8px;
+        font: 12px/1.45 ui-monospace, Menlo, monospace;
+        max-height: 280px; overflow: auto; white-space: pre-wrap; word-break: break-word;
       }
     </style>
   </head>
   <body>
     <div class="wrap">
       <header>
-        <h1>WEEKLY F&amp;O — Daily Generator</h1>
-        <p>Pulls today's NSE end-of-day closes &amp; ATPs, appends them to the workbook, and offers a download.</p>
+        <h1>Angel One — Login</h1>
+        <p>Click the button to open the login popup. Enter your TOTP and submit.</p>
       </header>
 
       <div class="card">
-        <div class="row">
-          <button id="genBtn" class="btn-primary" type="button">Generate latest xlsx</button>
-          <button id="dlBtn" class="btn-success" type="button" disabled>Download xlsx</button>
-          <button id="lastBtn" class="btn-ghost" type="button">Show last run</button>
-        </div>
-
+        <button id="openBtn" type="button">Login to Angel One</button>
         <div id="status" class="status"></div>
-        <div id="stats" class="stats" style="display:none;">
-          <div class="stat"><div class="k">Trading Day</div><div class="v" id="s-trading">—</div></div>
-          <div class="stat"><div class="k">Updated</div><div class="v" id="s-updated">—</div></div>
-          <div class="stat"><div class="k">Skipped</div><div class="v" id="s-skipped">—</div></div>
-        </div>
         <pre id="raw" style="display:none;"></pre>
       </div>
+    </div>
 
-      <footer>NSE EOD source • generated server-side • open access</footer>
+    <div id="backdrop" class="backdrop" role="dialog" aria-modal="true">
+      <div class="modal">
+        <h2>Angel One Login</h2>
+        <p class="sub">Fill in your credentials and the 6-digit TOTP from your authenticator app.</p>
+
+        <form id="loginForm" autocomplete="off">
+          <label for="apiKey">API Key</label>
+          <input id="apiKey" name="apiKey" type="text" placeholder="SmartAPI private key" />
+
+          <label for="clientCode">Client Code</label>
+          <input id="clientCode" name="clientCode" type="text" placeholder="e.g. A1234" />
+
+          <label for="pin">PIN</label>
+          <input id="pin" name="pin" type="password" inputmode="numeric" placeholder="Trading PIN" />
+
+          <label for="totp">TOTP</label>
+          <input id="totp" name="totp" class="totp" type="text" inputmode="numeric"
+                 maxlength="6" pattern="[0-9]{6}" placeholder="••••••" required />
+
+          <div class="actions">
+            <button type="button" class="ghost" id="cancelBtn">Cancel</button>
+            <button type="submit" id="submitBtn">Login</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <script>
-      const genBtn = document.getElementById("genBtn");
-      const dlBtn = document.getElementById("dlBtn");
-      const lastBtn = document.getElementById("lastBtn");
-      const statusEl = document.getElementById("status");
-      const statsEl = document.getElementById("stats");
-      const raw = document.getElementById("raw");
+      // If valid token exists, skip login
+      (function() {
+        const token = localStorage.getItem("jwtToken");
+        if (token) {
+          try {
+            const payload = JSON.parse(atob(token.split(".")[1]));
+            if (payload.exp && payload.exp * 1000 > Date.now()) {
+              window.location.href = "/dashboard.html";
+              return;
+            }
+            // Token expired — clear and show login
+            localStorage.removeItem("jwtToken");
+            localStorage.removeItem("refreshToken");
+            localStorage.removeItem("feedToken");
+          } catch {}
+        }
+      })();
 
-      let lastDatedName = null;
+      const $ = (id) => document.getElementById(id);
+      const backdrop = $("backdrop");
+      const statusEl = $("status");
+      const raw = $("raw");
 
       function setStatus(kind, html) {
         statusEl.className = "status show " + (kind || "");
         statusEl.innerHTML = html;
       }
-      function showStats(r) {
-        statsEl.style.display = "grid";
-        document.getElementById("s-trading").textContent = r.tradingDay ? "Yes" : "No";
-        document.getElementById("s-updated").textContent = r.updatedSheets ?? "—";
-        document.getElementById("s-skipped").textContent = r.skippedSheets ?? "—";
+
+      function openModal() {
+        backdrop.classList.add("show");
+        setTimeout(() => $("totp").focus(), 50);
+      }
+      function closeModal() {
+        backdrop.classList.remove("show");
+        $("totp").value = "";
       }
 
-      function applyResult(r) {
-        raw.style.display = "block";
-        raw.textContent = JSON.stringify(r, null, 2);
-        if (r.ok) {
-          showStats(r);
-          lastDatedName = r.datedName || null;
-          dlBtn.disabled = !lastDatedName;
-          setStatus("ok", `<div class="label">✓ Generated <code>${r.datedName || "(no file)"}</code></div>${r.todayIst ? "Date: " + r.todayIst : ""}`);
-        } else {
-          dlBtn.disabled = true;
-          setStatus("err", `<div class="label">✗ Failed</div>${r.error || "Unknown error"}`);
-        }
-      }
-
-      genBtn.addEventListener("click", async () => {
-        genBtn.disabled = true;
-        dlBtn.disabled = true;
-        setStatus("", '<span class="pulse"></span> Fetching NSE EOD CSVs and updating workbook…');
+      $("openBtn").addEventListener("click", async () => {
+        // Prefill from server (.env) if available.
         try {
-          const r = await fetch("/send", { method: "POST" });
-          const j = await r.json();
-          applyResult(j);
-        } catch (e) {
-          setStatus("err", "Network error: " + e.message);
-        } finally {
-          genBtn.disabled = false;
-        }
-      });
-
-      dlBtn.addEventListener("click", () => {
-        if (!lastDatedName) return;
-        window.location.href = "/download/" + encodeURIComponent(lastDatedName);
-      });
-
-      lastBtn.addEventListener("click", async () => {
-        setStatus("", "Loading last run…");
-        try {
-          const r = await fetch("/last-run");
-          if (r.status === 404) {
-            setStatus("err", "No run yet — click Generate first.");
-            dlBtn.disabled = true;
-            return;
-          }
-          const j = await r.json();
-          applyResult(j);
-        } catch (e) {
-          setStatus("err", "Network error: " + e.message);
-        }
-      });
-
-      // On load: probe last-run quietly so the Download button can light up.
-      (async () => {
-        try {
-          const r = await fetch("/last-run");
+          const r = await fetch("/api/angel/defaults");
           if (r.ok) {
             const j = await r.json();
-            if (j.ok && j.datedName) {
-              lastDatedName = j.datedName;
-              dlBtn.disabled = false;
-              setStatus("ok", `Previous run available: <code>${j.datedName}</code>`);
-              showStats(j);
-            }
+            if (j.apiKey) $("apiKey").value = j.apiKey;
+            if (j.clientCode) $("clientCode").value = j.clientCode;
+            if (j.hasPin) $("pin").placeholder = "(loaded from .env — leave blank to use it)";
           }
         } catch {}
-      })();
+        openModal();
+      });
+
+      $("cancelBtn").addEventListener("click", closeModal);
+      backdrop.addEventListener("click", (e) => { if (e.target === backdrop) closeModal(); });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && backdrop.classList.contains("show")) closeModal();
+      });
+
+      $("loginForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const submitBtn = $("submitBtn");
+        const payload = {
+          apiKey: $("apiKey").value.trim(),
+          clientCode: $("clientCode").value.trim(),
+          pin: $("pin").value,
+          totp: $("totp").value.trim(),
+        };
+        if (!/^\d{6}$/.test(payload.totp)) {
+          alert("TOTP must be 6 digits");
+          return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Logging in…";
+        setStatus("", "Sending login request to Angel One…");
+        try {
+          const r = await fetch("/api/angel/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const j = await r.json();
+          raw.style.display = "block";
+          raw.textContent = JSON.stringify(j, null, 2);
+          if (j.ok) {
+            localStorage.setItem("jwtToken", j.jwtToken);
+            localStorage.setItem("refreshToken", j.refreshToken);
+            localStorage.setItem("feedToken", j.feedToken);
+            localStorage.setItem("apiKey", payload.apiKey);
+            window.location.href = "/dashboard.html";
+            return;
+          } else {
+            setStatus("err", "<b>✗ Login failed.</b> " + (j.error || "Unknown error"));
+          }
+        } catch (err) {
+          setStatus("err", "Network error: " + err.message);
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Login";
+        }
+      });
     </script>
   </body>
 </html>

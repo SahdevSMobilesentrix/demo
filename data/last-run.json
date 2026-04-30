@@ -1,15 +1,15 @@
 {
-  "startedAt": "2026-04-30T07:09:40.086Z",
+  "startedAt": "2026-04-30T07:26:45.486Z",
   "todayIst": "2026-04-30",
   "datedName": "WEEKLY_FNO_2026-04-30.xlsx",
   "datedPath": "/tmp/WEEKLY_FNO_2026-04-30.xlsx",
   "tradingDay": true,
-  "lastFilled": "2026-04-29",
+  "lastFilled": "2026-04-24",
   "daysFilled": 0,
   "filledDates": [],
   "updatedSheets": 0,
   "skippedSheets": 0,
   "error": null,
   "ok": true,
-  "finishedAt": "2026-04-30T07:09:42.332Z"
+  "finishedAt": "2026-04-30T07:26:48.241Z"
 }

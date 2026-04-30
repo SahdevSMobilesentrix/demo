@@ -1,5 +1,5 @@
 {
-  "name": "weekly-fno-bot",
+  "name": "angel-one-login",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -7,15 +7,13 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "node src/server.js",
-    "run-once": "node -e \"import('./src/job/daily.js').then(m=>m.runDailyJob().then(r=>console.log(JSON.stringify(r,null,2))))\""
+    "start": "node src/server.js"
   },
   "dependencies": {
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
-    "exceljs": "^4.4.0",
     "express": "^4.21.0",
-    "form-data": "^4.0.5",
-    "pino": "^9.4.0"
+    "pino": "^9.4.0",
+    "xlsx": "^0.18.5"
   }
 }
