@@ -2,8 +2,11 @@
 
 import "dotenv/config";
 import express from "express";
+import multer from "multer";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import XLSX from "xlsx";
 import pino from "pino";
 import { loginAngelOne } from "./brokers/angelone.js";
 import {
@@ -286,6 +289,78 @@ app.post("/api/angel/generate", authMiddleware, async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+// POST /api/angel/upload — replace WEEKLY.xlsx with a user-uploaded file.
+// Used when the user has filled many missed days locally and wants to upload
+// the catch-up version, so the next /generate only needs to fill recent days.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB cap
+});
+
+app.post(
+  "/api/angel/upload",
+  authMiddleware,
+  upload.single("file"),
+  (req, res) => {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ ok: false, error: "No file uploaded" });
+    }
+
+    // Validate it's a real XLSX with the expected sheet structure
+    let wb;
+    try {
+      wb = XLSX.read(req.file.buffer, { type: "buffer" });
+    } catch (err) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "Not a valid XLSX file: " + err.message });
+    }
+
+    if (!wb.SheetNames || wb.SheetNames.length === 0) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "Uploaded XLSX has no sheets" });
+    }
+
+    // Sanity check: at least NIFTY-50 sheet should exist
+    if (!wb.SheetNames.includes("NIFTY-50")) {
+      return res.status(400).json({
+        ok: false,
+        error:
+          "Uploaded XLSX is missing the 'NIFTY-50' sheet — doesn't look like a WEEKLY.xlsx",
+      });
+    }
+
+    const xlsxPath = getXlsxPath();
+
+    // Backup current file before overwrite (timestamped, in same dir)
+    try {
+      if (fs.existsSync(xlsxPath)) {
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        const backupPath = xlsxPath.replace(/\.xlsx$/, `.backup-${ts}.xlsx`);
+        fs.copyFileSync(xlsxPath, backupPath);
+      }
+      fs.writeFileSync(xlsxPath, req.file.buffer);
+    } catch (err) {
+      log.error({ err: err.message }, "upload write failed");
+      return res
+        .status(500)
+        .json({ ok: false, error: "Could not save file: " + err.message });
+    }
+
+    log.info(
+      { sheets: wb.SheetNames.length, size: req.file.buffer.length },
+      "WEEKLY.xlsx replaced from upload"
+    );
+
+    res.json({
+      ok: true,
+      sheetsInUpload: wb.SheetNames.length,
+      message: "WEEKLY.xlsx replaced. Click Generate to fill remaining days.",
+    });
+  }
+);
 
 app.get("/api/angel/download", authMiddleware, (_req, res) => {
   const xlsxPath = getXlsxPath();

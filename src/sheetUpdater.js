@@ -60,7 +60,7 @@ export function resolveSheetSymbol(sheetName, overrides) {
  * Returns an array of plan entries, one per sheet.
  */
 export function planUpdates(targetDate) {
-  const wb = XLSX.readFile(XLSX_PATH);
+  const wb = XLSX.readFile(XLSX_PATH, { cellStyles: true, cellNF: true });
   const overrides = loadOverrides();
   const targetSerial = dateToSerial(targetDate);
   const plans = [];
@@ -144,7 +144,7 @@ export function planUpdates(targetDate) {
  * @returns {{ updatedSheets, alreadyFilled, skippedSheets, missingData, targetDate }}
  */
 export function applyUpdates(plans, dataBySymbolDate, targetDate) {
-  const wb = XLSX.readFile(XLSX_PATH);
+  const wb = XLSX.readFile(XLSX_PATH, { cellStyles: true, cellNF: true });
 
   const updatedSheets = []; // { sheet, datesFilled }
   const alreadyFilled = []; // sheets fully up-to-date
@@ -251,7 +251,7 @@ export function applyUpdates(plans, dataBySymbolDate, targetDate) {
     }
   }
 
-  XLSX.writeFile(wb, XLSX_PATH);
+  XLSX.writeFile(wb, XLSX_PATH, { cellStyles: true });
 
   return {
     updatedSheets,
@@ -262,13 +262,33 @@ export function applyUpdates(plans, dataBySymbolDate, targetDate) {
   };
 }
 
+/** Find an existing cell in the same column to copy formatting from. */
+function findStyleSourceInColumn(ws, col) {
+  const range = XLSX.utils.decode_range(ws["!ref"]);
+  // Look at row 1 (first data row, just below header) downward — first cell with z/s wins
+  for (let r = 1; r <= range.e.r; r++) {
+    const ref = XLSX.utils.encode_cell({ r, c: col });
+    const c = ws[ref];
+    if (c && (c.z || c.s)) return { z: c.z, s: c.s };
+  }
+  return null;
+}
+
 function writeCell(ws, row, col, value) {
   if (value == null || isNaN(value)) {
     deleteCell(ws, row, col);
     return;
   }
   const ref = XLSX.utils.encode_cell({ r: row, c: col });
-  ws[ref] = { t: "n", v: value };
+  // Inherit number format / style from an existing cell in the same column so
+  // new rows render consistently with the rest of the sheet (e.g. "#,##0.00").
+  const style = findStyleSourceInColumn(ws, col);
+  const cell = { t: "n", v: value };
+  if (style) {
+    if (style.z) cell.z = style.z;
+    if (style.s) cell.s = style.s;
+  }
+  ws[ref] = cell;
   // Extend range if needed
   const range = XLSX.utils.decode_range(ws["!ref"]);
   if (row > range.e.r) range.e.r = row;
@@ -283,7 +303,7 @@ function deleteCell(ws, row, col) {
 
 /** Per-sheet summary for the dashboard. */
 export function getSheetSummary() {
-  const wb = XLSX.readFile(XLSX_PATH);
+  const wb = XLSX.readFile(XLSX_PATH, { cellStyles: true, cellNF: true });
   const summary = [];
 
   for (const sheetName of wb.SheetNames) {

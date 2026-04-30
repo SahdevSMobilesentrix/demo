@@ -91,7 +91,12 @@
         <div class="btn-row">
           <button id="generateBtn" type="button">Generate Sheet</button>
           <button id="downloadBtn" class="ok" type="button">Download XLSX</button>
+          <button id="uploadBtn" class="ghost" type="button">Upload XLSX</button>
+          <input id="uploadInput" type="file" accept=".xlsx" style="display:none" />
         </div>
+        <p style="margin: 12px 0 0; color: var(--muted); font-size: 12px;">
+          <b>Upload</b> replaces WEEKLY.xlsx with your manually-updated version. Use this when many days are pending — fill them locally, upload, then Generate fills only the remaining recent days.
+        </p>
         <div id="status" class="status"></div>
       </div>
 
@@ -279,6 +284,55 @@
         } finally {
           generateBtn.disabled = false;
           generateBtn.textContent = "Generate Sheet";
+        }
+      });
+
+      // --- Upload XLSX ---
+      const uploadBtn = document.getElementById("uploadBtn");
+      const uploadInput = document.getElementById("uploadInput");
+
+      uploadBtn.addEventListener("click", () => uploadInput.click());
+
+      uploadInput.addEventListener("change", async () => {
+        const file = uploadInput.files && uploadInput.files[0];
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith(".xlsx")) {
+          setStatus("err", "Please select a .xlsx file.");
+          uploadInput.value = "";
+          return;
+        }
+
+        const token = getToken();
+        if (!token) { window.location.href = "/index.html"; return; }
+
+        if (!confirm("Replace WEEKLY.xlsx with " + file.name + "?\n\nA timestamped backup of the current file will be kept on the server.")) {
+          uploadInput.value = "";
+          return;
+        }
+
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = "Uploading...";
+        setStatus("", "Uploading " + escHtml(file.name) + "...");
+
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          const res = await fetch("/api/angel/upload", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + token },
+            body: fd,
+          });
+          if (handle401(res)) return;
+          const json = await res.json();
+          if (!json.ok) throw new Error(json.error || "Upload failed");
+          setStatus("ok", "<b>Uploaded.</b> " + escHtml(json.message || "") + " Sheets: " + json.sheetsInUpload);
+          await loadSummary();
+        } catch (err) {
+          setStatus("err", "Upload error: " + escHtml(err.message));
+        } finally {
+          uploadBtn.disabled = false;
+          uploadBtn.textContent = "Upload XLSX";
+          uploadInput.value = "";
         }
       });
 
