@@ -1,0 +1,22 @@
+{
+  "_comment": "Sheet name -> NSE tradingsymbol. Only entries that differ from the sheet name need to be listed here. Set value to null to skip the sheet entirely.",
+
+  "NIFTY-50": "NIFTY 50",
+  "BANKNIFTY": "NIFTY BANK",
+
+  "B.AUTO": "BAJAJ-AUTO",
+  "M&M": "M&M",
+  "INDUSBANK": "INDUSINDBK",
+  "TMPV": "TATAMOTORS",
+  "BANKOFBARODA": "BANKBARODA",
+  "HDFC": "HDFCBANK",
+  "TECHMAHINDRA": "TECHM",
+  "GODREJPROPERTIES": "GODREJPROP",
+  "BHARATFORGE": "BHARATFORG",
+  "JINDALSTEEL": "JINDALSTEL",
+  "AUROPHARMA": "AUROPHARMA",
+  "BAJAJFINSERV": "BAJAJFINSV",
+  "BAJAJFINANCE": "BAJFINANCE",
+  "REC": "RECLTD",
+  "Vaswani": null
+}

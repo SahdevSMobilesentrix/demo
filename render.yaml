@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: weekly-fno-bot
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: node src/server.js
+    healthCheckPath: /health
+    disk:
+      name: weekly-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATA_DIR
+        value: /data
+      - key: SEED_FILE
+        value: ./seed/WEEKLY_FNO.xlsx
