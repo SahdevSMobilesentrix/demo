@@ -15,6 +15,7 @@ import {
   fetchQuotes,
   fetchHistoricalDaily,
 } from "./brokers/angelMarketData.js";
+import { getEodFor } from "./brokers/nseBhavcopy.js";
 import {
   planUpdates,
   applyUpdates,
@@ -182,10 +183,41 @@ app.post("/api/angel/generate", authMiddleware, async (req, res) => {
     const dataBySymbolDate = {};
     const todayISO = fmtISO(todayDate);
 
-    // 4a — Today's data via FULL quote (exact VWAP), only when target is today
+    // 4a — NSE bhavcopy: authoritative EOD source (matches what the user types
+    // by hand — exact CLOSE_PRICE and AVG_PRICE / VWAP). Try this BEFORE Angel
+    // for every (symbol, date), since Angel candle gives only approximated ATP
+    // and Angel quotes can lag/snapshot during market hours. Bhavcopy publishes
+    // ~18:00 IST so today's file may 404 — that's fine, fall through to 4b/4c.
+    {
+      // Group dates → symbols so we fetch each bhavcopy once.
+      const datesNeeded = new Set();
+      for (const dates of symbolToDates.values()) {
+        for (const d of dates) datesNeeded.add(d);
+      }
+      log.info({ count: datesNeeded.size }, "looking up NSE bhavcopy for dates");
+      for (const isoDate of datesNeeded) {
+        const dateObj = new Date(isoDate + "T00:00:00Z");
+        for (const [sym, dates] of symbolToDates) {
+          if (!dates.has(isoDate)) continue;
+          try {
+            const eod = await getEodFor(sym, dateObj);
+            if (!eod) continue;
+            if (!dataBySymbolDate[sym]) dataBySymbolDate[sym] = {};
+            dataBySymbolDate[sym][isoDate] = eod;
+          } catch (err) {
+            log.warn({ sym, isoDate, err: err.message }, "bhavcopy lookup failed");
+          }
+        }
+      }
+    }
+
+    // 4b — Today's data via FULL quote (exact VWAP), only when target is today
+    //      AND bhavcopy didn't already supply it.
     const symbolsNeedingToday = [];
     for (const [sym, dates] of symbolToDates) {
-      if (dates.has(todayISO) && targetIsToday) symbolsNeedingToday.push(sym);
+      if (!dates.has(todayISO) || !targetIsToday) continue;
+      if (dataBySymbolDate[sym]?.[todayISO]) continue; // bhavcopy already filled
+      symbolsNeedingToday.push(sym);
     }
     // Track which symbols still need today's data (e.g. indices where avgPrice
     // is 0 / unavailable from the quote API — fallback to historical below).
@@ -223,11 +255,12 @@ app.post("/api/angel/generate", authMiddleware, async (req, res) => {
       }
     }
 
-    // 4b — Historical data via candle API (ATP approximated as (O+H+L+C)/4).
-    // For each symbol: include past dates ALWAYS, plus today if quote API
-    // didn't supply a usable avgPrice (indices fall here).
+    // 4c — Historical data via candle API (ATP approximated as (O+H+L+C)/4).
+    // Fallback ONLY for (sym, date) pairs not already filled by bhavcopy/quote.
     for (const [sym, datesSet] of symbolToDates) {
+      const filled = dataBySymbolDate[sym] || {};
       const dates = [...datesSet].filter((d) => {
+        if (filled[d]) return false; // already covered by bhavcopy or quote
         if (d !== todayISO) return true; // past dates always
         // Today: include if it wasn't satisfied by quote API
         return symbolsNeedingTodayHistorical.has(sym) || !targetIsToday;
