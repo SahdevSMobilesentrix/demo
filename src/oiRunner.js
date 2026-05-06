@@ -206,7 +206,9 @@ export function stopOiTest() {
   return { ok: true };
 }
 
-export async function startOiTest({ jwtToken, apiKey, minutes = 60, lots = 1, maxRupees = 15000 }) {
+// Default cap = 375 min (full NSE trading day). Frontend doesn't pass minutes;
+// runs until Stop is clicked or this hard cap is hit.
+export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, maxRupees = 15000 }) {
   if (state && (state.status === "running" || state.status === "starting")) {
     throw new Error("OI test already running. Stop it first.");
   }

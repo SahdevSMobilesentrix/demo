@@ -73,16 +73,13 @@
       <div class="card">
         <h3 style="margin:0 0 8px">Start Test</h3>
         <p style="margin:0 0 12px;color:var(--muted);font-size:13px">
-          You're already logged in. Pick the run window and lot size, then hit
+          You're already logged in. Set lot size and per-trade cap, then hit
           <b>Start</b>. The server uses your existing Angel One session to poll
           option-chain OI every minute and streams ticks here — newest first.
+          Runs until you hit <b>Stop</b>.
         </p>
         <form id="startForm" autocomplete="off">
-          <div class="row" style="grid-template-columns:1fr 1fr 1fr">
-            <div>
-              <label for="minutes">Minutes</label>
-              <input id="minutes" type="number" min="1" max="375" value="60" />
-            </div>
+          <div class="row" style="grid-template-columns:1fr 1fr">
             <div>
               <label for="lots">Lots</label>
               <input id="lots" type="number" min="1" value="1" />
@@ -186,7 +183,6 @@
 
         const payload = {
           apiKey,
-          minutes: parseInt($("minutes").value, 10),
           lots: parseInt($("lots").value, 10),
           maxRupees: parseFloat($("maxRupees").value),
         };
@@ -299,13 +295,13 @@
       function renderInfo(s) {
         if (s.status === "idle") { runInfo.style.display = "none"; return; }
         runInfo.style.display = "flex";
-        const remain = s.endsAt ? Math.max(0, Math.round((s.endsAt - Date.now()) / 60000)) : null;
+        const elapsed = s.startedAt ? Math.max(0, Math.round((Date.now() - s.startedAt) / 60000)) : null;
         runInfo.innerHTML =
           '<span>Status: <b>' + escHtml(s.status) + '</b></span>' +
           (s.atm != null ? '<span>ATM: <b>' + s.atm + '</b></span>' : '') +
           (s.expiry ? '<span>Expiry: <b>' + escHtml(s.expiry) + '</b></span>' : '') +
           (s.spotOpen != null ? '<span>Spot at start: <b>' + s.spotOpen + '</b></span>' : '') +
-          (remain != null ? '<span>Minutes left: <b>' + remain + '</b></span>' : '') +
+          (elapsed != null ? '<span>Running: <b>' + elapsed + ' min</b></span>' : '') +
           (s.error ? ' <span style="color:var(--danger)">Error: ' + escHtml(s.error) + '</span>' : '');
       }
 
