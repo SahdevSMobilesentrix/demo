@@ -79,7 +79,7 @@
           Runs until you hit <b>Stop</b>.
         </p>
         <form id="startForm" autocomplete="off">
-          <div class="row" style="grid-template-columns:1fr 1fr">
+          <div class="row" style="grid-template-columns:1fr 1fr 1fr">
             <div>
               <label for="lots">Lots</label>
               <input id="lots" type="number" min="1" value="1" />
@@ -88,6 +88,10 @@
               <label for="maxRupees">Max ₹/trade</label>
               <input id="maxRupees" type="number" min="100" value="15000" />
             </div>
+            <div>
+              <label for="tradesPerDay">Trades / day</label>
+              <input id="tradesPerDay" type="number" min="1" max="10" value="2" />
+            </div>
           </div>
           <div class="actions">
             <button type="submit" id="startBtn">Start OI Test</button>
@@ -95,6 +99,7 @@
           </div>
         </form>
         <div id="status" class="status"></div>
+        <div id="haltBanner" class="status" style="display:none;border-color:rgba(245,166,35,.6);background:rgba(245,166,35,.08);color:var(--warn)"></div>
         <div class="info" id="runInfo" style="display:none"></div>
       </div>
 
@@ -108,6 +113,22 @@
         <div class="card">
           <h3 style="margin:0 0 8px">Server Log</h3>
           <div class="log" id="logWrap">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3 style="margin:0">Day-wise Trade History</h3>
+          <button class="ghost" id="refreshHistBtn" type="button" style="padding:6px 12px;font-size:12px">Refresh</button>
+        </div>
+        <p style="margin:0 0 10px;color:var(--muted);font-size:12.5px">
+          All closed paper-trades, persisted on the server. Charges include brokerage,
+          STT, exchange txn, SEBI, stamp duty, and GST (discount-broker model).
+          <b>Net P&amp;L</b> = Gross P&amp;L − total charges.
+        </p>
+        <div id="histTotals" style="margin-bottom:12px"></div>
+        <div class="table-scroll" style="max-height:420px">
+          <div id="histWrap"><p class="empty">No history yet.</p></div>
         </div>
       </div>
 
@@ -185,6 +206,7 @@
           apiKey,
           lots: parseInt($("lots").value, 10),
           maxRupees: parseFloat($("maxRupees").value),
+          tradesPerDay: parseInt($("tradesPerDay").value, 10),
         };
 
         startBtn.disabled = true;
@@ -292,6 +314,14 @@
         ).join("");
       }
 
+      function renderHalt(halt) {
+        const el = $("haltBanner");
+        if (!halt) { el.style.display = "none"; return; }
+        const icon = halt.reason === "loss" ? "⚠️" : "🛑";
+        el.style.display = "block";
+        el.innerHTML = '<b>' + icon + ' Trading disabled — ' + escHtml(halt.message) + '</b>';
+      }
+
       function renderInfo(s) {
         if (s.status === "idle") { runInfo.style.display = "none"; return; }
         runInfo.style.display = "flex";
@@ -311,6 +341,7 @@
           if (handle401(r)) return;
           const s = await r.json();
           renderInfo(s);
+          renderHalt(s.halt);
           renderTicks(s.ticks);
           renderTrades(s.trades, s.openTrade);
           renderLog(s.log);
@@ -323,6 +354,117 @@
       }
       poll();
       setInterval(poll, 5000);
+
+      // ---------- Day-wise history ----------
+      const histWrap = $("histWrap");
+      const histTotals = $("histTotals");
+      const inrFmt = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
+      const inr = (v) => "₹" + (v == null ? "-" : inrFmt.format(v));
+      const pnlSpan = (v) => {
+        if (v == null) return "-";
+        const cls = v >= 0 ? "b-bull" : "b-bear";
+        return '<span class="badge ' + cls + '">' + inr(v) + '</span>';
+      };
+
+      function renderHistory(h) {
+        if (!h || !h.days || h.days.length === 0) {
+          histTotals.innerHTML = "";
+          histWrap.innerHTML = '<p class="empty">No history yet.</p>';
+          return;
+        }
+        const t = h.totals || {};
+        histTotals.innerHTML =
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px">' +
+            stat("Trades", t.count) +
+            stat("Wins / Losses", (t.wins || 0) + " / " + (t.losses || 0)) +
+            stat("Capital deployed", inr(t.capital)) +
+            stat("Gross P&L", pnlSpan(t.grossPnl)) +
+            stat("Total charges", inr(t.totalCharges)) +
+            stat("Net P&L", pnlSpan(t.netPnl)) +
+          '</div>';
+
+        let html = '<table><thead><tr>'
+          + '<th>Date</th><th class="num">Trades</th><th class="num">W / L</th>'
+          + '<th class="num">Capital</th><th class="num">Gross P&amp;L</th>'
+          + '<th class="num">Charges</th><th class="num">Net P&amp;L</th><th></th>'
+          + '</tr></thead><tbody>';
+        for (let i = 0; i < h.days.length; i++) {
+          const d = h.days[i];
+          html += '<tr class="day-row" data-i="' + i + '" style="cursor:pointer">'
+            + '<td><b>' + escHtml(d.day) + '</b></td>'
+            + '<td class="num">' + d.count + '</td>'
+            + '<td class="num">' + d.wins + ' / ' + d.losses + '</td>'
+            + '<td class="num">' + inr(d.capital) + '</td>'
+            + '<td class="num">' + pnlSpan(d.grossPnl) + '</td>'
+            + '<td class="num">' + inr(d.totalCharges) + '</td>'
+            + '<td class="num">' + pnlSpan(d.netPnl) + '</td>'
+            + '<td style="color:var(--muted)">▸</td>'
+            + '</tr>'
+            + '<tr class="day-detail" data-i="' + i + '" style="display:none"><td colspan="8" style="background:var(--panel-2);padding:10px 14px">'
+            + renderTradesDetail(d.trades)
+            + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        histWrap.innerHTML = html;
+
+        histWrap.querySelectorAll(".day-row").forEach(row => {
+          row.addEventListener("click", () => {
+            const i = row.getAttribute("data-i");
+            const det = histWrap.querySelector('.day-detail[data-i="' + i + '"]');
+            const open = det.style.display !== "none";
+            det.style.display = open ? "none" : "table-row";
+            row.lastElementChild.textContent = open ? "▸" : "▾";
+          });
+        });
+      }
+
+      function stat(label, val) {
+        return '<div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">'
+             + escHtml(label) + '</div><div style="font-size:15px;font-weight:600;margin-top:2px">'
+             + (val == null ? "-" : val) + '</div></div>';
+      }
+
+      function renderTradesDetail(trades) {
+        let html = '<table style="margin:0"><thead><tr>'
+          + '<th>Entry</th><th>Exit</th><th>Side</th><th>Strike</th>'
+          + '<th class="num">Qty</th><th class="num">Entry ₹</th><th class="num">Exit ₹</th>'
+          + '<th class="num">Capital</th><th class="num">Gross P&amp;L</th>'
+          + '<th class="num">Charges</th><th class="num">Net P&amp;L</th><th>Reason</th>'
+          + '</tr></thead><tbody>';
+        for (const t of trades) {
+          const ch = t.charges || {};
+          const chTip = `Brokerage ₹${ch.brokerage} · STT ₹${ch.stt} · Exch ₹${ch.exchangeTxn} · SEBI ₹${ch.sebi} · Stamp ₹${ch.stamp} · GST ₹${ch.gst}`;
+          html += '<tr>'
+            + '<td>' + fmtTime(t.entryTs) + '</td>'
+            + '<td>' + fmtTime(t.exitTs) + '</td>'
+            + '<td>' + escHtml(t.side) + '</td>'
+            + '<td class="num">' + escHtml(t.strike) + '</td>'
+            + '<td class="num">' + escHtml(t.qty ?? "-") + '</td>'
+            + '<td class="num">' + escHtml(t.entryPx) + '</td>'
+            + '<td class="num">' + escHtml(t.exitPx) + '</td>'
+            + '<td class="num">' + inr(t.capital) + '</td>'
+            + '<td class="num">' + pnlSpan(t.grossPnl ?? t.pnl) + '</td>'
+            + '<td class="num" title="' + escHtml(chTip) + '">' + inr(ch.total ?? 0) + '</td>'
+            + '<td class="num">' + pnlSpan(t.netPnl ?? t.pnl) + '</td>'
+            + '<td>' + escHtml(t.reason) + '</td>'
+            + '</tr>';
+        }
+        html += '</tbody></table>';
+        return html;
+      }
+
+      async function loadHistory() {
+        try {
+          const r = await fetch("/api/oi/history", { headers: authHeaders() });
+          if (handle401(r)) return;
+          const j = await r.json();
+          if (j.ok) renderHistory(j);
+        } catch {}
+      }
+      $("refreshHistBtn").addEventListener("click", loadHistory);
+      loadHistory();
+      // Also refresh history every 30s so newly-closed trades show up.
+      setInterval(loadHistory, 30000);
     </script>
   </body>
 </html>

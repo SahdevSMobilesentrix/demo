@@ -29,6 +29,7 @@ import {
   nowIST,
 } from "./dateUtils.js";
 import { startOiTest, getOiState, stopOiTest } from "./oiRunner.js";
+import { getDayWiseHistory, migrateLegacyJson } from "./oiHistory.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const log = pino({ level: process.env.LOG_LEVEL || "info" });
@@ -415,6 +416,7 @@ app.post("/api/oi/start", authMiddleware, async (req, res) => {
       minutes: req.body.minutes,
       lots: req.body.lots,
       maxRupees: req.body.maxRupees,
+      tradesPerDay: req.body.tradesPerDay,
     });
     res.json(out);
   } catch (err) {
@@ -429,6 +431,22 @@ app.get("/api/oi/state", authMiddleware, (_req, res) => {
 app.post("/api/oi/stop", authMiddleware, (_req, res) => {
   res.json(stopOiTest());
 });
+
+app.get("/api/oi/history", authMiddleware, (_req, res) => {
+  try {
+    res.json({ ok: true, ...getDayWiseHistory() });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// One-time import of any pre-existing JSON history into the new txt DB.
+try {
+  const m = migrateLegacyJson();
+  if (m.migrated > 0) log.info({ count: m.migrated }, "migrated legacy oi_trades.json -> oi_trades.txt");
+} catch (err) {
+  log.warn({ err: err.message }, "oi history migration skipped");
+}
 
 const port = process.env.PORT || 3000;
 app.listen(port, () =>

@@ -2,11 +2,27 @@
 // via start/getState/stop so a browser can drive it instead of a CLI.
 
 import { loadInstruments, fetchQuotes } from "./brokers/angelMarketData.js";
+import { recordTrade } from "./oiHistory.js";
 
 const POLL_SEC = 60;
 const LOOKBACK_MIN = 15;
 const STRIKE_STEP = 50;
 const NIFTY_LOT_SIZE = 75;
+
+// Exit thresholds, expressed as fractions of `maxRupees` (per-trade cap).
+// Tuned for intraday OI-flow scalps — small, frequent moves rather than
+// session-long swings. Edit here to retune.
+const TARGET_FRAC = 0.20; // +20% of cap → exit profit
+const STOP_FRAC   = 0.15; // -15% of cap → exit loss
+
+// Per-day trade caps (counted against IST calendar day):
+//   - Hard cap: at most params.tradesPerDay entries (user-configurable; default 2).
+//   - "Cut losses" rule: if the FIRST completed trade of the day is a loss,
+//     no further entries that day (so on a losing first trade, only 1 trade total).
+const istDateKey = () => {
+  const d = istNow();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
 
 const istNow = () =>
   new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
@@ -128,6 +144,8 @@ function freshState(params) {
     expiry: null,
     spotOpen: null,
     log: [],
+    halt: null,         // { day, reason, message } — surfaces as UI banner
+    lastBlockedDay: null,
   };
 }
 
@@ -139,6 +157,32 @@ function pushLog(msg) {
 
 function maybeEnter(bias, latest, atm) {
   if (!state || state.openTrade) return;
+
+  // Daily caps (IST calendar day).
+  const today = istDateKey();
+  // Reset halt banner when a new IST day starts.
+  if (state.halt && state.halt.day !== today) state.halt = null;
+
+  const cap = Math.max(1, +(state.params.tradesPerDay || 2));
+  const todays = state.trades.filter(t => t.dayKey === today);
+
+  if (todays.length >= cap) {
+    const msg = `Daily cap reached: ${cap} trade${cap>1?"s":""} done for ${today}. No more entries today.`;
+    if (state.lastBlockedDay !== today) { pushLog(msg); state.lastBlockedDay = today; }
+    state.halt = { day: today, reason: "cap", message: msg };
+    return;
+  }
+  // After a losing first trade, lock the day at 1 trade — regardless of cap.
+  // Use netPnl (after charges) when available so the rule matches what hits the wallet.
+  const first = todays[todays.length - 1];
+  const firstPnl = first ? (first.netPnl ?? first.pnl) : 0;
+  if (todays.length >= 1 && firstPnl < 0) {
+    const msg = `First trade of ${today} closed at a loss (₹${firstPnl}). Trading disabled for the rest of the day.`;
+    if (state.lastBlockedDay !== today) { pushLog(msg); state.lastBlockedDay = today; }
+    state.halt = { day: today, reason: "loss", message: msg };
+    return;
+  }
+
   const { lots, maxRupees } = state.params;
   let side = null;
   if (bias === "Strong Bullish") side = "LONG_CE";
@@ -172,11 +216,24 @@ function maybeExit(bias, latest, reason = null) {
   const flipped =
     (ot.side === "LONG_CE" && (bias === "Strong Bearish" || bias === "Bearish")) ||
     (ot.side === "LONG_PE" && (bias === "Strong Bullish" || bias === "Bullish"));
-  const stop = pnl < -maxRupees * 0.4;
-  const target = pnl > maxRupees * 0.5;
+  const stop = pnl < -maxRupees * STOP_FRAC;
+  const target = pnl > maxRupees * TARGET_FRAC;
   const why = reason || (flipped ? "BIAS_FLIP" : stop ? "STOP" : target ? "TARGET" : null);
   if (!why) return;
-  state.trades.unshift({ ...ot, exitTs: latest.ts, exitPx: px, pnl: round(pnl), reason: why });
+  const dayKey = istDateKey();
+  const closed = { ...ot, exitTs: latest.ts, exitPx: px, pnl: round(pnl), reason: why, dayKey };
+  let enriched;
+  try {
+    enriched = recordTrade({
+      ...closed,
+      lots: state.params.lots,
+      lotSize: NIFTY_LOT_SIZE,
+    });
+  } catch (e) {
+    pushLog(`history persist failed: ${e.message}`);
+    enriched = closed;
+  }
+  state.trades.unshift(enriched);
   pushLog(`PAPER EXIT ${ot.symbol} @ ₹${px} P&L=₹${round(pnl)} reason=${why}`);
   state.openTrade = null;
 }
@@ -192,6 +249,7 @@ export function getOiState() {
     expiry: state.expiry,
     spotOpen: state.spotOpen,
     error: state.error,
+    halt: state.halt,
     openTrade: state.openTrade,
     // Newest first for both lists
     ticks: state.ticks.slice(0, 500),
@@ -208,12 +266,12 @@ export function stopOiTest() {
 
 // Default cap = 375 min (full NSE trading day). Frontend doesn't pass minutes;
 // runs until Stop is clicked or this hard cap is hit.
-export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, maxRupees = 15000 }) {
+export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, maxRupees = 15000, tradesPerDay = 2 }) {
   if (state && (state.status === "running" || state.status === "starting")) {
     throw new Error("OI test already running. Stop it first.");
   }
   if (!jwtToken || !apiKey) throw new Error("jwtToken and apiKey required");
-  const params = { minutes: +minutes, lots: +lots, maxRupees: +maxRupees };
+  const params = { minutes: +minutes, lots: +lots, maxRupees: +maxRupees, tradesPerDay: Math.max(1, +tradesPerDay) };
   state = freshState(params);
 
   // Run the loop in the background; surface errors via state.error.
