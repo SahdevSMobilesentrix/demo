@@ -170,6 +170,8 @@ export async function fetchQuotes(jwtToken, apiKey, tokens) {
           // this as `avgPrice` in FULL mode quotes. This is the exchange's
           // official VWAP and matches NSE bhavcopy AVG_PRICE.
           avgPrice: q.avgPrice != null ? parseFloat(q.avgPrice) : null,
+          opnInterest: q.opnInterest != null ? parseFloat(q.opnInterest) : null,
+          tradeVolume: q.tradeVolume != null ? parseFloat(q.tradeVolume) : null,
         };
       }
     }

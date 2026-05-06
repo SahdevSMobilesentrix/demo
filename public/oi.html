@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OI Writing — Live</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg:#0f1115; --panel:#181b22; --panel-2:#20242d;
+        --border:#2a2f3a; --text:#e6e8ee; --muted:#8b93a7;
+        --accent:#4f8cff; --ok:#21c07a; --danger:#ff5d6c; --warn:#f5a623;
+      }
+      @media (prefers-color-scheme: light) {
+        :root { --bg:#f6f7fb; --panel:#fff; --panel-2:#f1f3f8;
+          --border:#d9dde7; --text:#1a1d24; --muted:#5c6478; }
+      }
+      *{box-sizing:border-box}
+      body{margin:0;min-height:100vh;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+      .wrap{max-width:1100px;margin:0 auto;padding:24px 20px}
+      .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+      h1{font-size:22px;margin:0}
+      .tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--border)}
+      .tab{padding:10px 16px;cursor:pointer;border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;color:var(--muted);font-weight:600;text-decoration:none;display:inline-block}
+      .tab.active{background:var(--panel);border-color:var(--border);color:var(--text)}
+      .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px}
+      button{padding:10px 16px;font-size:14px;font-weight:600;border:0;border-radius:8px;cursor:pointer;background:var(--accent);color:#fff}
+      button[disabled]{opacity:.55;cursor:not-allowed}
+      button.ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
+      button.danger{background:var(--danger)}
+      label{display:block;font-size:11px;font-weight:600;margin:10px 0 4px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+      input{width:100%;padding:10px 12px;font-size:14px;border:1px solid var(--border);border-radius:8px;background:var(--panel-2);color:var(--text);outline:none}
+      input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,140,255,.15)}
+      input.totp{font-size:20px;letter-spacing:6px;text-align:center;font-family:ui-monospace,Menlo,monospace}
+      .row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+      .row .totp-cell{grid-column:span 2}
+      .actions{display:flex;gap:10px;margin-top:14px}
+      .info{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:10px}
+      .info b{color:var(--text)}
+      .table-scroll{overflow-x:auto;max-height:560px;overflow-y:auto}
+      table{width:100%;border-collapse:collapse;font-size:12.5px}
+      th,td{text-align:left;padding:6px 9px;white-space:nowrap;border-bottom:1px solid var(--border)}
+      th{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;background:var(--panel);z-index:1}
+      td.num{text-align:right;font-family:ui-monospace,Menlo,monospace}
+      .empty{color:var(--muted);text-align:center;padding:30px}
+      .badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700}
+      .b-bull{background:rgba(33,192,122,.18);color:var(--ok)}
+      .b-bear{background:rgba(255,93,108,.18);color:var(--danger)}
+      .b-neutral{background:rgba(139,147,167,.18);color:var(--muted)}
+      .b-warmup{background:rgba(245,166,35,.18);color:var(--warn)}
+      .status{margin-top:14px;padding:12px;border-radius:10px;font-size:13px;background:var(--panel-2);border:1px solid var(--border);display:none}
+      .status.show{display:block}
+      .status.err{border-color:rgba(255,93,108,.5);color:var(--danger)}
+      .status.ok{border-color:rgba(33,192,122,.5)}
+      .log{max-height:140px;overflow:auto;font:11.5px/1.4 ui-monospace,Menlo,monospace;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px}
+      .log div{margin-bottom:2px}
+      .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+      @media (max-width:780px){.grid-2{grid-template-columns:1fr}.row{grid-template-columns:1fr 1fr}}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <h1>OI Writing — Live Indicator</h1>
+        <button class="ghost" id="logoutBtn" type="button">Logout</button>
+      </div>
+
+      <div class="tabs">
+        <a class="tab active" href="/oi.html">OI Writing Test</a>
+        <a class="tab" href="/dashboard.html">ATP / WEEKLY Sheet</a>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 8px">Start Test</h3>
+        <p style="margin:0 0 12px;color:var(--muted);font-size:13px">
+          You're already logged in. Pick the run window and lot size, then hit
+          <b>Start</b>. The server uses your existing Angel One session to poll
+          option-chain OI every minute and streams ticks here — newest first.
+        </p>
+        <form id="startForm" autocomplete="off">
+          <div class="row" style="grid-template-columns:1fr 1fr 1fr">
+            <div>
+              <label for="minutes">Minutes</label>
+              <input id="minutes" type="number" min="1" max="375" value="60" />
+            </div>
+            <div>
+              <label for="lots">Lots</label>
+              <input id="lots" type="number" min="1" value="1" />
+            </div>
+            <div>
+              <label for="maxRupees">Max ₹/trade</label>
+              <input id="maxRupees" type="number" min="100" value="15000" />
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" id="startBtn">Start OI Test</button>
+            <button type="button" class="danger" id="stopBtn" disabled>Stop</button>
+          </div>
+        </form>
+        <div id="status" class="status"></div>
+        <div class="info" id="runInfo" style="display:none"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3 style="margin:0 0 8px">Trades (newest first)</h3>
+          <div class="table-scroll" style="max-height:240px">
+            <div id="tradesWrap"><p class="empty">No trades yet.</p></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 8px">Server Log</h3>
+          <div class="log" id="logWrap">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 8px">Live Ticks (newest first)</h3>
+        <div class="table-scroll">
+          <div id="tableWrap"><p class="empty">Waiting for ticks…</p></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- Auth guard: require login first ---
+      function getToken() {
+        const token = localStorage.getItem("jwtToken");
+        if (!token) return null;
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          if (payload.exp && payload.exp * 1000 < Date.now()) return null;
+          return token;
+        } catch { return null; }
+      }
+      function clearAuth() {
+        localStorage.removeItem("jwtToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("feedToken");
+        localStorage.removeItem("apiKey");
+      }
+      function authHeaders() { return { Authorization: "Bearer " + getToken() }; }
+      function handle401(res) {
+        if (res.status === 401) { clearAuth(); window.location.href = "/index.html"; return true; }
+        return false;
+      }
+      if (!getToken()) { window.location.href = "/index.html"; }
+
+      const $ = (id) => document.getElementById(id);
+      const statusEl = $("status");
+      const runInfo = $("runInfo");
+      const tableWrap = $("tableWrap");
+      const tradesWrap = $("tradesWrap");
+      const logWrap = $("logWrap");
+      const startBtn = $("startBtn");
+      const stopBtn = $("stopBtn");
+
+      function setStatus(kind, html) {
+        statusEl.className = "status show " + (kind || "");
+        statusEl.innerHTML = html;
+      }
+      function escHtml(s) {
+        return String(s == null ? "" : s)
+          .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      }
+      function fmtTime(ts) {
+        if (!ts) return "-";
+        return new Date(ts).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" });
+      }
+      function biasBadge(b) {
+        if (!b || b === "WARMUP") return '<span class="badge b-warmup">' + escHtml(b || "WARMUP") + '</span>';
+        if (b.includes("Bullish")) return '<span class="badge b-bull">' + escHtml(b) + '</span>';
+        if (b.includes("Bearish")) return '<span class="badge b-bear">' + escHtml(b) + '</span>';
+        return '<span class="badge b-neutral">' + escHtml(b) + '</span>';
+      }
+
+      $("logoutBtn").addEventListener("click", () => {
+        clearAuth();
+        window.location.href = "/index.html";
+      });
+
+      $("startForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const apiKey = localStorage.getItem("apiKey") || "";
+        if (!apiKey) { alert("API key missing — please log in again."); window.location.href = "/index.html"; return; }
+
+        const payload = {
+          apiKey,
+          minutes: parseInt($("minutes").value, 10),
+          lots: parseInt($("lots").value, 10),
+          maxRupees: parseFloat($("maxRupees").value),
+        };
+
+        startBtn.disabled = true;
+        startBtn.textContent = "Starting…";
+        setStatus("", "Loading instruments & starting poll loop…");
+        try {
+          const r = await fetch("/api/oi/start", {
+            method: "POST",
+            headers: { ...authHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (handle401(r)) return;
+          const j = await r.json();
+          if (!j.ok) throw new Error(j.error || "Failed to start");
+          setStatus("ok", "<b>Test running.</b> Polling every minute. Newest tick on top.");
+          stopBtn.disabled = false;
+        } catch (err) {
+          setStatus("err", "Start failed: " + escHtml(err.message));
+          startBtn.disabled = false;
+        } finally {
+          startBtn.textContent = "Start OI Test";
+        }
+      });
+
+      stopBtn.addEventListener("click", async () => {
+        stopBtn.disabled = true;
+        stopBtn.textContent = "Stopping…";
+        try {
+          const r = await fetch("/api/oi/stop", { method: "POST", headers: authHeaders() });
+          handle401(r);
+        } catch {}
+        stopBtn.textContent = "Stop";
+      });
+
+      function renderTicks(ticks) {
+        if (!ticks || ticks.length === 0) {
+          tableWrap.innerHTML = '<p class="empty">Waiting for ticks…</p>';
+          return;
+        }
+        let html = '<table><thead><tr>'
+          + '<th>Time (IST)</th><th>Spot</th><th>CE OI</th><th>PE OI</th>'
+          + '<th>CE Δ</th><th>PE Δ</th><th>Net Flow</th><th>PCR</th>'
+          + '<th>Net</th><th>Strength</th><th>Bias</th><th>Trade</th>'
+          + '</tr></thead><tbody>';
+        for (const t of ticks) {
+          html += '<tr>'
+            + '<td>' + escHtml(t.tsIST || fmtTime(t.ts)) + '</td>'
+            + '<td class="num">' + escHtml(t.spot) + '</td>'
+            + '<td class="num">' + escHtml(t.ceTotal) + '</td>'
+            + '<td class="num">' + escHtml(t.peTotal) + '</td>'
+            + '<td class="num">' + escHtml(t.ceDelta ?? "-") + '</td>'
+            + '<td class="num">' + escHtml(t.peDelta ?? "-") + '</td>'
+            + '<td class="num">' + escHtml(t.netFlow ?? "-") + '</td>'
+            + '<td class="num">' + escHtml(t.pcrOI ?? "-") + '</td>'
+            + '<td class="num">' + escHtml(t.net ?? "-") + '</td>'
+            + '<td class="num">' + escHtml(t.strength != null ? t.strength + "%" : "-") + '</td>'
+            + '<td>' + biasBadge(t.bias) + '</td>'
+            + '<td>' + escHtml(t.tradeNote || "") + '</td>'
+            + '</tr>';
+        }
+        html += '</tbody></table>';
+        tableWrap.innerHTML = html;
+      }
+
+      function renderTrades(trades, openTrade) {
+        const rows = [];
+        if (openTrade) {
+          rows.push({
+            entryTs: openTrade.entryTs, exitTs: null,
+            side: openTrade.side, strike: openTrade.strike,
+            entryPx: openTrade.entryPx, exitPx: null, pnl: null,
+            reason: "OPEN",
+          });
+        }
+        if (trades) for (const t of trades) rows.push(t);
+        if (rows.length === 0) {
+          tradesWrap.innerHTML = '<p class="empty">No trades yet.</p>';
+          return;
+        }
+        let html = '<table><thead><tr>'
+          + '<th>Entry</th><th>Exit</th><th>Side</th><th>Strike</th>'
+          + '<th>Entry ₹</th><th>Exit ₹</th><th>P&amp;L</th><th>Reason</th>'
+          + '</tr></thead><tbody>';
+        for (const t of rows) {
+          const pnlCls = t.pnl == null ? "" : (t.pnl >= 0 ? "b-bull" : "b-bear");
+          html += '<tr>'
+            + '<td>' + fmtTime(t.entryTs) + '</td>'
+            + '<td>' + (t.exitTs ? fmtTime(t.exitTs) : '<span class="badge b-warmup">OPEN</span>') + '</td>'
+            + '<td>' + escHtml(t.side) + '</td>'
+            + '<td class="num">' + escHtml(t.strike) + '</td>'
+            + '<td class="num">' + escHtml(t.entryPx) + '</td>'
+            + '<td class="num">' + escHtml(t.exitPx ?? "-") + '</td>'
+            + '<td class="num">' + (t.pnl == null ? "-" : '<span class="badge ' + pnlCls + '">₹' + t.pnl + '</span>') + '</td>'
+            + '<td>' + escHtml(t.reason) + '</td>'
+            + '</tr>';
+        }
+        html += '</tbody></table>';
+        tradesWrap.innerHTML = html;
+      }
+
+      function renderLog(log) {
+        if (!log || log.length === 0) { logWrap.textContent = "—"; return; }
+        logWrap.innerHTML = log.map(l =>
+          '<div>[' + fmtTime(l.ts) + '] ' + escHtml(l.msg) + '</div>'
+        ).join("");
+      }
+
+      function renderInfo(s) {
+        if (s.status === "idle") { runInfo.style.display = "none"; return; }
+        runInfo.style.display = "flex";
+        const remain = s.endsAt ? Math.max(0, Math.round((s.endsAt - Date.now()) / 60000)) : null;
+        runInfo.innerHTML =
+          '<span>Status: <b>' + escHtml(s.status) + '</b></span>' +
+          (s.atm != null ? '<span>ATM: <b>' + s.atm + '</b></span>' : '') +
+          (s.expiry ? '<span>Expiry: <b>' + escHtml(s.expiry) + '</b></span>' : '') +
+          (s.spotOpen != null ? '<span>Spot at start: <b>' + s.spotOpen + '</b></span>' : '') +
+          (remain != null ? '<span>Minutes left: <b>' + remain + '</b></span>' : '') +
+          (s.error ? ' <span style="color:var(--danger)">Error: ' + escHtml(s.error) + '</span>' : '');
+      }
+
+      async function poll() {
+        try {
+          const r = await fetch("/api/oi/state", { headers: authHeaders() });
+          if (handle401(r)) return;
+          const s = await r.json();
+          renderInfo(s);
+          renderTicks(s.ticks);
+          renderTrades(s.trades, s.openTrade);
+          renderLog(s.log);
+
+          const running = s.status === "running" || s.status === "starting" || s.status === "stopping";
+          startBtn.disabled = running;
+          stopBtn.disabled = !running;
+          if (s.status === "error") setStatus("err", "Error: " + escHtml(s.error || "unknown"));
+        } catch {}
+      }
+      poll();
+      setInterval(poll, 5000);
+    </script>
+  </body>
+</html>

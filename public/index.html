@@ -138,7 +138,7 @@
           try {
             const payload = JSON.parse(atob(token.split(".")[1]));
             if (payload.exp && payload.exp * 1000 > Date.now()) {
-              window.location.href = "/dashboard.html";
+              window.location.href = "/oi.html";
               return;
             }
             // Token expired — clear and show login
@@ -218,7 +218,7 @@
             localStorage.setItem("refreshToken", j.refreshToken);
             localStorage.setItem("feedToken", j.feedToken);
             localStorage.setItem("apiKey", payload.apiKey);
-            window.location.href = "/dashboard.html";
+            window.location.href = "/oi.html";
             return;
           } else {
             setStatus("err", "<b>✗ Login failed.</b> " + (j.error || "Unknown error"));

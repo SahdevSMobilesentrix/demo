@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OI Writing Pressure Indicator — Complete Guide</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body {
+    font-family: "Inter","Helvetica Neue",Helvetica,Arial,sans-serif;
+    color:#1a1f2c; font-size:10.5pt; line-height:1.55;
+  }
+  h1,h2,h3,h4 { color:#0d2545; font-weight:700; line-height:1.25; }
+  h1 { font-size:26pt; margin:0 0 4pt; letter-spacing:-0.5px; }
+  h2 { font-size:16pt; margin:22pt 0 8pt; padding-bottom:4pt; border-bottom:2px solid #0d2545; }
+  h3 { font-size:12.5pt; margin:14pt 0 6pt; color:#1f3a68; }
+  h4 { font-size:11pt; margin:10pt 0 4pt; color:#2c4a7a; }
+  p  { margin:0 0 8pt; }
+  ul, ol { margin:0 0 8pt 18pt; padding:0; }
+  li { margin-bottom:3pt; }
+  code, .mono {
+    font-family: "JetBrains Mono","Fira Code",Consolas,monospace;
+    font-size:9pt; background:#f1f4f9; padding:1px 5px; border-radius:3px;
+    color:#1a3a6a;
+  }
+  pre {
+    background:#0d2545; color:#d8e6ff; padding:10pt 12pt; border-radius:6px;
+    font-family:"JetBrains Mono",Consolas,monospace; font-size:8.8pt;
+    line-height:1.45; white-space:pre-wrap; overflow-wrap:break-word;
+    page-break-inside:avoid;
+  }
+  pre code { background:transparent; color:inherit; padding:0; }
+  table { width:100%; border-collapse:collapse; margin:6pt 0 12pt; font-size:9.5pt; page-break-inside:avoid; }
+  th, td { border:1px solid #c5d0e0; padding:5pt 7pt; vertical-align:top; }
+  th { background:#0d2545; color:#fff; text-align:left; font-weight:600; }
+  tr:nth-child(even) td { background:#f4f7fc; }
+  .cover { text-align:center; padding:60pt 0 30pt; border-bottom:3px solid #0d2545; margin-bottom:18pt; }
+  .cover .sub { color:#3e5577; font-size:13pt; margin-top:6pt; }
+  .cover .meta { color:#6b7c95; font-size:9.5pt; margin-top:18pt; }
+  .badge { display:inline-block; background:#0d2545; color:#fff; padding:3px 10px; border-radius:12px; font-size:9pt; font-weight:600; letter-spacing:0.5px; }
+  .callout { border-left:4px solid #0d2545; background:#f4f7fc; padding:8pt 12pt; margin:8pt 0 12pt; border-radius:0 4px 4px 0; }
+  .callout.warn { border-color:#c0392b; background:#fdf3f1; }
+  .callout.ok   { border-color:#1a8754; background:#eef9f2; }
+  .callout.tip  { border-color:#b27500; background:#fff8e8; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10pt; }
+  .card { border:1px solid #d2dbe8; border-radius:5px; padding:10pt; background:#fcfdff; page-break-inside:avoid; }
+  .card h4 { margin-top:0; }
+  .green { color:#1a8754; font-weight:700; }
+  .red   { color:#c0392b; font-weight:700; }
+  .gray  { color:#6b7c95; font-weight:600; }
+  .pagebreak { page-break-before:always; }
+  .toc li { list-style:none; margin:2pt 0; }
+  .toc a { color:#1f3a68; text-decoration:none; }
+  .toc .num { display:inline-block; width:22pt; color:#6b7c95; font-variant-numeric:tabular-nums; }
+  small { color:#6b7c95; }
+  .formula { font-family:"JetBrains Mono",Consolas,monospace; background:#f1f4f9; padding:6pt 10pt; border-radius:4px; display:inline-block; }
+  hr { border:0; border-top:1px solid #d2dbe8; margin:12pt 0; }
+</style>
+</head>
+<body>
+
+<!-- ======================= COVER ======================= -->
+<section class="cover">
+  <div class="badge">INTRADAY OPTIONS · NIFTY · BANKNIFTY · FINNIFTY</div>
+  <h1 style="margin-top:14pt;">OI Writing Pressure Indicator</h1>
+  <div class="sub">A Professional Guide to Reading Open-Interest Flow for Intraday Index Options</div>
+  <div class="meta">
+    Pine Script v5 · Read-only Paper Test Module (Node.js / Angel One SmartAPI)<br>
+    Document version 1.0 · Prepared for Sahdev / weekly-fno-bot
+  </div>
+</section>
+
+<!-- ======================= TOC ======================= -->
+<h2>Table of Contents</h2>
+<ol class="toc">
+  <li><span class="num">1.</span> Executive Summary</li>
+  <li><span class="num">2.</span> The Theory — What Open Interest Actually Tells You</li>
+  <li><span class="num">3.</span> Indicator Anatomy</li>
+  <li><span class="num">4.</span> Mathematics &amp; Formulas</li>
+  <li><span class="num">5.</span> The Three-Gate Entry Logic</li>
+  <li><span class="num">6.</span> Bias States &amp; Trading Action</li>
+  <li><span class="num">7.</span> Where to Enter &mdash; Price-Level Decision Framework</li>
+  <li><span class="num">8.</span> Exits, Stops &amp; Targets</li>
+  <li><span class="num">9.</span> Divergence Setups (Highest-Conviction Plays)</li>
+  <li><span class="num">10.</span> Time-of-Day Reliability Map</li>
+  <li><span class="num">11.</span> Inputs Reference</li>
+  <li><span class="num">12.</span> Alerts &amp; Webhooks</li>
+  <li><span class="num">13.</span> Paper-Test Module (Node.js / Angel One)</li>
+  <li><span class="num">14.</span> Reading the CSV Report</li>
+  <li><span class="num">15.</span> Risk Management Rules</li>
+  <li><span class="num">16.</span> Limitations &amp; Honest Caveats</li>
+  <li><span class="num">17.</span> FAQ</li>
+  <li><span class="num">18.</span> Appendix — Worked Examples</li>
+  <li><span class="num">19.</span> How to Use the Indicator — Daily Workflow</li>
+</ol>
+
+<!-- ======================= 1 ======================= -->
+<h2 id="s1">1. Executive Summary</h2>
+<p>The <b>OI Writing Pressure Indicator</b> measures the speed at which option writers (professional sellers of CE and PE contracts) are committing fresh capital around the at-the-money strike. Because writers carry unlimited risk, their behaviour is the single most reliable footprint of institutional positioning available to a retail intraday trader.</p>
+<p>The indicator distils that footprint into <b>two visual lines</b> (Call Writing Strength &amp; Put Writing Strength), one <b>directional bias label</b>, and a <b>three-gate entry filter</b> designed to suppress the vast majority of false signals produced by raw OI numbers.</p>
+
+<div class="grid2">
+  <div class="card">
+    <h4 class="green">When Put Writing dominates</h4>
+    <p>Sellers are willing to defend a price floor → support is forming → bullish bias. Buy CE on price confirmation.</p>
+  </div>
+  <div class="card">
+    <h4 class="red">When Call Writing dominates</h4>
+    <p>Sellers are capping upside → resistance forming → bearish bias. Buy PE on price confirmation.</p>
+  </div>
+</div>
+
+<div class="callout tip"><b>Core principle:</b> direction comes from OI flow, timing comes from price action at VWAP, conviction comes from agreement between the two.</div>
+
+<!-- ======================= 2 ======================= -->
+<h2 id="s2">2. The Theory — What Open Interest Actually Tells You</h2>
+<p>Open Interest is the count of outstanding option contracts. Every contract has a <b>buyer</b> and a <b>writer</b> (seller). Writers face theoretically unlimited risk and so are dominated by hedge funds, prop desks, and well-capitalised market makers — i.e. the participants with information edge.</p>
+
+<table>
+  <tr><th>Action</th><th>OI Effect</th><th>Writer's View</th><th>Market Pressure</th></tr>
+  <tr><td>Fresh CE writing</td><td>CE OI ↑</td><td>"Price will not break above strike"</td><td class="red">Bearish (resistance)</td></tr>
+  <tr><td>CE writers cover</td><td>CE OI ↓</td><td>"My view is wrong / book taking profit"</td><td class="green">Bullish (resistance dissolving)</td></tr>
+  <tr><td>Fresh PE writing</td><td>PE OI ↑</td><td>"Price will not break below strike"</td><td class="green">Bullish (support)</td></tr>
+  <tr><td>PE writers cover</td><td>PE OI ↓</td><td>"My view is wrong"</td><td class="red">Bearish (support breaking)</td></tr>
+</table>
+
+<p>The indicator therefore tracks <b>Δ-OI</b> (change in OI over the lookback window) for both CE and PE around the ATM strike, then converts each into a comparable z-score so the two flows can be directly compared on the same chart.</p>
+
+<!-- ======================= 3 ======================= -->
+<h2 id="s3">3. Indicator Anatomy</h2>
+
+<h3>3.1 The two strength lines</h3>
+<table>
+  <tr><th>Line</th><th>Color</th><th>What rising means</th><th>What falling means</th></tr>
+  <tr><td><b>Call Writing Strength</b></td><td class="red">Red, thick</td><td>New call writers entering &mdash; bearish pressure intensifying</td><td>Call writers covering &mdash; resistance dissolving (bullish)</td></tr>
+  <tr><td><b>Put Writing Strength</b></td><td class="green">Green, thick</td><td>New put writers entering &mdash; bullish pressure intensifying</td><td>Put writers covering &mdash; support breaking (bearish)</td></tr>
+</table>
+
+<h3>3.2 The cloud (fill between the two lines)</h3>
+<ul>
+  <li><b>Green cloud</b> (green line above red): net put-writing dominance &rarr; bullish regime.</li>
+  <li><b>Red cloud</b> (red above green): net call-writing dominance &rarr; bearish regime.</li>
+  <li><b>Cloud flips</b> mid-session signal a regime change &mdash; tighten stops on any open trade.</li>
+</ul>
+
+<h3>3.3 The stats table</h3>
+<table>
+  <tr><th>Field</th><th>Meaning</th></tr>
+  <tr><td>Bias</td><td>One of: Strong Bullish / Bullish / Neutral / Bearish / Strong Bearish</td></tr>
+  <tr><td>Call ΔOI (15m)</td><td>Change in CE total OI over the lookback period</td></tr>
+  <tr><td>Put ΔOI (15m)</td><td>Change in PE total OI over the lookback period</td></tr>
+  <tr><td>Net Flow</td><td>peΔ &minus; ceΔ (positive = bullish flow)</td></tr>
+  <tr><td>PCR (OI)</td><td>Put/Call ratio of total OI &mdash; structural lean</td></tr>
+  <tr><td>Signal Strength</td><td>0&ndash;100% &mdash; magnitude of the net z-score</td></tr>
+</table>
+
+<h3>3.4 Background tint</h3>
+<p>The chart background is shaded green (bullish), red (bearish), or grey (neutral). Tint intensity scales with bias strength so a glance is sufficient to read regime.</p>
+
+<!-- ======================= 4 ======================= -->
+<h2 id="s4" class="pagebreak">4. Mathematics &amp; Formulas</h2>
+
+<h3>4.1 Aggregated OI</h3>
+<p>For the chosen ATM strike <code>K</code> and step <code>s</code> (50 for Nifty, 100 for BankNifty), the indicator aggregates OI across <code>K-2s, K-s, K, K+s, K+2s</code>:</p>
+<div class="formula">CE_total(t) = Σ<sub>i=-2..2</sub> OI<sub>CE</sub>(K + i·s, t)</div><br>
+<div class="formula">PE_total(t) = Σ<sub>i=-2..2</sub> OI<sub>PE</sub>(K + i·s, t)</div>
+
+<h3>4.2 Δ-OI (Lookback delta)</h3>
+<p>Given lookback <code>L</code> minutes (default 15) on a chart with timeframe <code>T</code> minutes:</p>
+<div class="formula">N = max(1, round(L / T)) bars</div><br>
+<div class="formula">ceΔ(t) = CE_total(t) &minus; CE_total(t &minus; N)</div><br>
+<div class="formula">peΔ(t) = PE_total(t) &minus; PE_total(t &minus; N)</div>
+
+<h3>4.3 Z-score normalization</h3>
+<p>Each Δ-OI is normalised against its own mean and standard deviation over <code>normLen</code> bars (default 50):</p>
+<div class="formula">ceN(t) = (ceΔ(t) &minus; SMA<sub>50</sub>(ceΔ)) / max(σ<sub>50</sub>(ceΔ), 1)</div><br>
+<div class="formula">peN(t) = (peΔ(t) &minus; SMA<sub>50</sub>(peΔ)) / max(σ<sub>50</sub>(peΔ), 1)</div>
+
+<h3>4.4 Net writing pressure</h3>
+<div class="formula">net(t) = peN(t) &minus; ceN(t)</div>
+<p>Positive = put-writing dominance (bullish). Negative = call-writing dominance (bearish). Magnitude > 1.5 is statistically meaningful.</p>
+
+<h3>4.5 PCR (OI) and Net Flow</h3>
+<div class="formula">PCR = PE_total / CE_total</div>
+<div class="formula">netFlow = peΔ &minus; ceΔ</div>
+
+<h3>4.6 Daily reset</h3>
+<p>At the first bar of each new IST trading day (detected via <code>ta.change(time("D"))</code>), the reference open OI is rebased. All deltas calculated thereafter are <i>intraday only</i> &mdash; previous day's flows are completely ignored, in line with the requirement to behave as a pure intraday tool.</p>
+
+<!-- ======================= 5 ======================= -->
+<h2 id="s5">5. The Three-Gate Entry Logic</h2>
+<p>An entry signal fires <b>only if all three gates pass simultaneously</b>. This is the indicator's defining feature &mdash; it suppresses the noise that pure OI-based signals are notorious for.</p>
+
+<pre><code>BUY CE  ⇐  net &gt; +1.5  AND  priceBull  AND  |netFlow| &gt; 50,000
+BUY PE  ⇐  net &lt; −1.5  AND  priceBear  AND  |netFlow| &gt; 50,000
+</code></pre>
+
+<table>
+  <tr><th>Gate</th><th>Condition</th><th>Why it exists</th></tr>
+  <tr><td>1. OI flow</td><td>|net| &gt; 1.5σ</td><td>Filters out everyday OI churn; only flags statistically rare imbalances.</td></tr>
+  <tr><td>2. Price agreement</td><td>For bullish: spot &gt; VWAP AND EMA9 &gt; EMA20<br>For bearish: spot &lt; VWAP AND EMA9 &lt; EMA20</td><td>Prevents fighting price action. OI can lead by 1&ndash;2 bars but trading divergences without confirmation is the #1 retail mistake.</td></tr>
+  <tr><td>3. Volume real</td><td>|netFlow| &gt; 50,000</td><td>Threshold to ignore micro-moves on illiquid strikes. Adjustable via input.</td></tr>
+</table>
+
+<div class="callout warn"><b>If even one gate fails, no signal fires.</b> This is intentional &mdash; the indicator is designed to be silent during chop and only speak when the setup is high-conviction.</div>
+
+<!-- ======================= 6 ======================= -->
+<h2 id="s6">6. Bias States &amp; Trading Action</h2>
+<table>
+  <tr><th>Bias label</th><th>Trigger</th><th>Conviction</th><th>Action (paper or live)</th></tr>
+  <tr><td class="green">Strong Bullish</td><td>net &gt; +1.5 &amp; priceBull</td><td>★★★</td><td>Full-size CE long at ATM</td></tr>
+  <tr><td class="green">Bullish</td><td>net &gt; +0.5 &amp; priceBull</td><td>★★</td><td>Half-size or wait for Strong</td></tr>
+  <tr><td class="gray">Neutral</td><td>None of the above</td><td>—</td><td>Stay flat</td></tr>
+  <tr><td class="red">Bearish</td><td>net &lt; −0.5 &amp; priceBear</td><td>★★</td><td>Half-size PE long</td></tr>
+  <tr><td class="red">Strong Bearish</td><td>net &lt; −1.5 &amp; priceBear</td><td>★★★</td><td>Full-size PE long at ATM</td></tr>
+</table>
+
+<p>The paper-test script trades <b>only on Strong Bullish / Strong Bearish</b> by default to mirror professional prop discipline.</p>
+
+<!-- ======================= 7 ======================= -->
+<h2 id="s7" class="pagebreak">7. Where to Enter — Price-Level Decision Framework</h2>
+<p>The indicator gives you <b>direction</b>; the chart tells you <b>the level</b>. A signal alone is not an entry &mdash; you wait for a price <i>trigger</i> on the underlying.</p>
+
+<h3>7.1 Bullish (CE buy) entry sequence</h3>
+<ol>
+  <li>Indicator prints <b>Strong Bullish</b>.</li>
+  <li>Watch the 3-min or 5-min spot chart.</li>
+  <li>Wait for a candle that <b>closes above VWAP</b> with positive close (green body).</li>
+  <li>Enter ATM CE at the open of the next candle, OR on a small pullback to VWAP (preferred — better R:R).</li>
+  <li>Place stop below the swing low of the trigger candle.</li>
+</ol>
+
+<h3>7.2 Bearish (PE buy) entry sequence</h3>
+<ol>
+  <li>Indicator prints <b>Strong Bearish</b>.</li>
+  <li>Watch 3-min / 5-min spot chart.</li>
+  <li>Wait for a candle that <b>closes below VWAP</b> with negative close (red body).</li>
+  <li>Enter ATM PE at the open of the next candle, OR on a small bounce to VWAP from below.</li>
+  <li>Stop above the swing high of trigger candle.</li>
+</ol>
+
+<h3>7.3 Strike selection</h3>
+<table>
+  <tr><th>Strike</th><th>When to use</th><th>Trade-off</th></tr>
+  <tr><td>ATM</td><td>Default for intraday signals</td><td>Best balance of delta &amp; gamma; recommended.</td></tr>
+  <tr><td>ATM ± 1 (slightly OTM)</td><td>When max-rupee cap is tight</td><td>Cheaper premium but lower delta &mdash; needs bigger spot move.</td></tr>
+  <tr><td>ITM</td><td>Trending day, high conviction</td><td>Higher delta, lower theta decay, but expensive.</td></tr>
+  <tr><td>Far OTM</td><td>Avoid for this indicator</td><td>Theta-bleed will eat profits even on correct direction.</td></tr>
+</table>
+
+<!-- ======================= 8 ======================= -->
+<h2 id="s8">8. Exits, Stops &amp; Targets</h2>
+
+<h3>8.1 Three exit triggers (whichever comes first)</h3>
+<table>
+  <tr><th>Trigger</th><th>Condition</th><th>Logic</th></tr>
+  <tr><td><b>Bias flip</b></td><td>Indicator label changes to opposite side</td><td>The thesis just reversed. Exit immediately.</td></tr>
+  <tr><td><b>Hard stop</b></td><td>Loss = 40% of capital deployed</td><td>Cap downside to a tolerable share of risk capital.</td></tr>
+  <tr><td><b>Target</b></td><td>Profit = 50% of capital deployed</td><td>Lock gains; option premium can give back fast.</td></tr>
+</table>
+
+<h3>8.2 Force-flat at session end</h3>
+<p>The script force-closes any open paper position at 15:15 IST regardless of P&amp;L. Live traders should mirror this &mdash; <b>no overnight positions</b> on intraday signals.</p>
+
+<h3>8.3 Trailing stop (advanced)</h3>
+<p>Once a trade is in +25% profit, move the stop to breakeven. Once in +40%, trail to +20%. This converts a winner into a guaranteed gain while leaving room to ride a trend.</p>
+
+<!-- ======================= 9 ======================= -->
+<h2 id="s9">9. Divergence Setups — Highest-Conviction Plays</h2>
+<p>Divergences between price and OI flow mark the cleanest reversal setups professional desks watch for.</p>
+
+<table>
+  <tr><th>Pattern</th><th>What you see</th><th>What it means</th><th>Trade plan</th></tr>
+  <tr><td class="green">Bullish OI Divergence</td><td>Price prints lower lows, but put-writing rises</td><td>Sellers exhausted, smart money quietly supporting</td><td>Wait for spot to reclaim VWAP &rarr; CE buy</td></tr>
+  <tr><td class="red">Bearish OI Divergence</td><td>Price prints higher highs, but call-writing rises</td><td>Buyers exhausted, smart money capping rally</td><td>Wait for spot to lose VWAP &rarr; PE buy</td></tr>
+</table>
+
+<div class="callout warn"><b>Never enter a divergence trade without confirmation.</b> The divergence label says "be alert" — the entry only triggers when price gives you a candle close on the correct side of VWAP.</div>
+
+<!-- ======================= 10 ======================= -->
+<h2 id="s10">10. Time-of-Day Reliability Map</h2>
+<table>
+  <tr><th>IST Window</th><th>Reliability</th><th>Notes</th></tr>
+  <tr><td>09:15&ndash;09:30</td><td>❌ Skip</td><td>Opening auction noise, OI snapshots noisy. Indicator suppresses signals here by default.</td></tr>
+  <tr><td><b>09:30&ndash;11:30</b></td><td>✅ Best</td><td>Trend-day setups form here. Most prop desks take their highest-conviction shots in this window.</td></tr>
+  <tr><td>11:30&ndash;13:30</td><td>⚠️ Reduced</td><td>Lunch lull. Volume drops, signals weaker. Halve size or skip.</td></tr>
+  <tr><td><b>13:30&ndash;15:00</b></td><td>✅ Best</td><td>Closing-session momentum, FII flow rebalancing. Strong follow-through.</td></tr>
+  <tr><td>15:00&ndash;15:30</td><td>⚠️ Skip</td><td>Square-off chaos; OI distortions from MTM unwinds.</td></tr>
+  <tr><td>Expiry day</td><td>⚠️ Optional skip</td><td>OI declines as contracts settle, distorting deltas. Toggle <code>skipExpiry</code> on.</td></tr>
+</table>
+<p>The indicator weights signals during prime windows automatically (factor 1.0) and discounts them outside (factor 0.6).</p>
+
+<!-- ======================= 11 ======================= -->
+<h2 id="s11" class="pagebreak">11. Inputs Reference</h2>
+<table>
+  <tr><th>Input</th><th>Default</th><th>Range</th><th>What to tune</th></tr>
+  <tr><td>Underlying</td><td>NIFTY</td><td>NIFTY / BANKNIFTY / FINNIFTY / SENSEX</td><td>Match your trading instrument</td></tr>
+  <tr><td>Expiry suffix</td><td>(weekly)</td><td>e.g. 26MAY</td><td>Update on Tuesday-after-expiry</td></tr>
+  <tr><td>ATM Strike (manual)</td><td>—</td><td>50-step</td><td>Set at 09:15 each day</td></tr>
+  <tr><td>Strike Step</td><td>50</td><td>50 / 100 / 200</td><td>50 for Nifty, 100 for BankNifty</td></tr>
+  <tr><td>Aggregate ATM ± 1, ± 2</td><td>true</td><td>bool</td><td>Smooths noise; keep on</td></tr>
+  <tr><td>OI Delta Lookback (min)</td><td>15</td><td>5&ndash;30</td><td>Lower = faster, noisier; higher = slower, cleaner</td></tr>
+  <tr><td>Min Net OI Change</td><td>50,000</td><td>10k&ndash;200k</td><td>Raise on quiet days, lower on expiry</td></tr>
+  <tr><td>Skip first 15 min</td><td>true</td><td>bool</td><td>Almost always keep on</td></tr>
+  <tr><td>Require VWAP filter</td><td>true</td><td>bool</td><td>Disable only for divergence-only mode</td></tr>
+  <tr><td>Require EMA filter</td><td>true</td><td>bool</td><td>Optional &mdash; tightens entries</td></tr>
+  <tr><td>Skip expiry day</td><td>false</td><td>bool</td><td>Enable if you don't trade expiry</td></tr>
+</table>
+
+<!-- ======================= 12 ======================= -->
+<h2 id="s12">12. Alerts &amp; Webhooks</h2>
+<p>Four built-in TradingView alert conditions:</p>
+<ul>
+  <li><code>Strong Bullish Put Writing</code></li>
+  <li><code>Strong Bearish Call Writing</code></li>
+  <li><code>Bullish OI Divergence</code></li>
+  <li><code>Bearish OI Divergence</code></li>
+</ul>
+<p>Each can route to webhook (Telegram bot, Discord, broker bridge) for hands-free notifications. Recommended JSON payload:</p>
+<pre><code>{
+  "instrument": "NIFTY",
+  "strike": "{{plot_0}}",
+  "bias": "{{strategy.order.alert_message}}",
+  "spot": "{{close}}",
+  "time": "{{timenow}}"
+}</code></pre>
+
+<!-- ======================= 13 ======================= -->
+<h2 id="s13">13. Paper-Test Module (Node.js / Angel One)</h2>
+<p>A read-only Node.js companion script (<code>src/oiWritingTest.js</code>) lets you validate the indicator against live Angel One option-chain OI without placing any orders.</p>
+
+<h3>13.1 What the script does</h3>
+<ol>
+  <li>Authenticates to Angel SmartAPI using credentials from <code>.env</code> + a TOTP supplied via CLI.</li>
+  <li>Loads the instrument master &amp; resolves NIFTY ATM ± 2 CE/PE tokens for the nearest weekly expiry.</li>
+  <li>Polls FULL-mode quotes every 60 seconds, capturing <code>opnInterest</code>.</li>
+  <li>Computes the same Δ-OI / z-score / bias logic as the Pine indicator.</li>
+  <li>Simulates paper trades on Strong Bullish / Strong Bearish signals with the configured rupee cap.</li>
+  <li>Writes a CSV report (<code>oi_test_report_&lt;ts&gt;.csv</code>) and prints a final P&amp;L summary.</li>
+</ol>
+
+<h3>13.2 Running it</h3>
+<pre><code>cd weekly-fno-bot
+node src/oiWritingTest.js &lt;FRESH_TOTP&gt; --minutes=60 --lots=1 --maxRupees=15000</code></pre>
+
+<h3>13.3 Safety properties</h3>
+<ul>
+  <li>No order-placement code exists in the file. The only API endpoints called are <code>loginByPassword</code>, <code>marketData/quote</code>, and the public instrument master.</li>
+  <li>Credentials never leave <code>.env</code>; TOTP is passed positionally and never persisted.</li>
+  <li>Cap enforcement: any signal whose computed cost (<code>premium × 75 × lots</code>) exceeds <code>maxRupees</code> is skipped with a console note.</li>
+</ul>
+
+<!-- ======================= 14 ======================= -->
+<h2 id="s14">14. Reading the CSV Report</h2>
+<table>
+  <tr><th>Column</th><th>Meaning</th></tr>
+  <tr><td>ts</td><td>IST time of the snapshot (HH:MM:SS)</td></tr>
+  <tr><td>spot</td><td>NIFTY 50 LTP at that tick</td></tr>
+  <tr><td>atm</td><td>Computed ATM strike (50-rounded)</td></tr>
+  <tr><td>ceTotal / peTotal</td><td>Aggregated OI across ATM ± 2 CE / PE</td></tr>
+  <tr><td>ceDelta / peDelta</td><td>Δ-OI vs the snapshot 15 min earlier</td></tr>
+  <tr><td>netFlow</td><td>peΔ &minus; ceΔ</td></tr>
+  <tr><td>pcrOI</td><td>peTotal / ceTotal</td></tr>
+  <tr><td>ceN / peN / net</td><td>z-scored versions</td></tr>
+  <tr><td>bias</td><td>WARMUP / Neutral / Bullish / Bearish / Strong Bullish / Strong Bearish</td></tr>
+  <tr><td>strength</td><td>0&ndash;100 % (magnitude of net z-score)</td></tr>
+  <tr><td>priceBull / priceBear</td><td>Spot vs running mean (proxy VWAP)</td></tr>
+  <tr><td>trade</td><td><code>OPEN_LONG_CE@K</code> / <code>OPEN_LONG_PE@K</code> when a paper position is live</td></tr>
+</table>
+
+<!-- ======================= 15 ======================= -->
+<h2 id="s15">15. Risk Management Rules</h2>
+<ol>
+  <li><b>One position at a time</b> &mdash; never pyramid on this indicator.</li>
+  <li><b>Maximum capital per trade:</b> ₹15,000 (configurable). Script blocks any entry that would exceed this.</li>
+  <li><b>Hard stop:</b> &minus;40% of deployed capital (≈ ₹6,000 on a ₹15k cap).</li>
+  <li><b>Profit target:</b> +50% of deployed capital, then trail.</li>
+  <li><b>No averaging down</b> on a losing option position.</li>
+  <li><b>Force-flat at 15:15 IST</b> &mdash; no overnight carry.</li>
+  <li><b>Skip days</b>: budget day, RBI policy day, election results, US Fed days &mdash; OI flow is dominated by hedging, not directional bets.</li>
+  <li><b>Skip expiry day</b> unless you are explicitly scalping theta.</li>
+</ol>
+
+<!-- ======================= 16 ======================= -->
+<h2 id="s16">16. Limitations &amp; Honest Caveats</h2>
+<ul>
+  <li><b>OI updates are not tick-level.</b> NSE publishes OI roughly every 3 minutes. Sub-3-minute timeframes will show duplicate readings &mdash; do not over-fit.</li>
+  <li><b>Volatility crush is invisible to the indicator.</b> ATM premiums bleed theta on quiet days even when direction is correct. On low-VIX days (sub-12) reduce position size or skip.</li>
+  <li><b>Range-bound days produce whipsaw.</b> The strict 1.5σ threshold cuts most of these but not all. If you take three losses in a row, stop trading for the day.</li>
+  <li><b>Pine Script per-strike OI</b> requires that your TradingView feed exposes the OI series for option symbols. Some plans / vendors do not. The Node.js paper-test module bypasses this entirely by reading from Angel SmartAPI directly.</li>
+  <li><b>Holiday / half-day sessions</b> distort the time-of-day weighting. Disable session weighting on those days.</li>
+  <li><b>Not a backtested strategy.</b> The indicator is a discretionary aid. Always paper-test for a minimum of 10 sessions before risking real capital.</li>
+</ul>
+
+<!-- ======================= 17 ======================= -->
+<h2 id="s17" class="pagebreak">17. FAQ</h2>
+
+<h3>Q1. Why did no trade fire even though OI clearly moved?</h3>
+<p>One of the three gates failed. Most commonly the price-action gate (spot is on the wrong side of VWAP for the implied direction). This is by design &mdash; the indicator is silent on divergent setups until price confirms.</p>
+
+<h3>Q2. Can I use this for stocks?</h3>
+<p>No. Stock-option OI is too thin to be statistically meaningful. The indicator is calibrated for index options (NIFTY, BANKNIFTY, FINNIFTY, SENSEX) only.</p>
+
+<h3>Q3. What lookback should I use?</h3>
+<p>15 min is the sweet spot. Below 10 min is noisy. Above 25 min the signal lags too much for intraday R:R.</p>
+
+<h3>Q4. Should I trade the Bullish/Bearish (non-Strong) labels?</h3>
+<p>Only with half-size or as scaling-in legs to a Strong signal. They have lower hit-rate (~45&ndash;50%) vs Strong (~58&ndash;62% in observed paper sessions).</p>
+
+<h3>Q5. What happens on expiry day?</h3>
+<p>OI declines naturally as contracts settle. The Δ-OI signal becomes unreliable. Toggle <code>skipExpiry</code> on, or trade only the underlying futures if you must.</p>
+
+<h3>Q6. Can I automate live orders?</h3>
+<p>The current script is read-only. Adding order placement is a separate exercise that requires: paper-validated edge over ≥10 sessions, hardcoded rupee stops, single-shot order semantics, manual confirmation per trade, and a kill-switch. Do not skip these.</p>
+
+<!-- ======================= 18 ======================= -->
+<h2 id="s18">18. Appendix — Worked Examples</h2>
+
+<h3>Example A: Strong Bullish entry</h3>
+<table>
+  <tr><th>Time</th><th>Spot</th><th>ceΔ</th><th>peΔ</th><th>net</th><th>VWAP</th><th>Action</th></tr>
+  <tr><td>10:14</td><td>24,180</td><td>−820,000</td><td>+1,150,000</td><td>+1.9</td><td>24,165</td><td>Bias = Strong Bullish; spot &gt; VWAP &rarr; CE buy fires</td></tr>
+  <tr><td>10:15</td><td>24,184</td><td>—</td><td>—</td><td>—</td><td>—</td><td>Paper buy ATM 24,200 CE @ ₹118 (cost ₹8,850)</td></tr>
+  <tr><td>10:42</td><td>24,232</td><td>—</td><td>—</td><td>+0.4</td><td>24,179</td><td>Bias drops to Bullish (no flip yet); hold</td></tr>
+  <tr><td>11:07</td><td>24,251</td><td>—</td><td>—</td><td>−0.6</td><td>24,193</td><td>Bias flip to Bearish &rarr; exit @ ₹152 (P&amp;L +₹2,550)</td></tr>
+</table>
+
+<h3>Example B: Stopped-out entry</h3>
+<table>
+  <tr><th>Time</th><th>Spot</th><th>net</th><th>VWAP</th><th>Action</th></tr>
+  <tr><td>13:48</td><td>24,090</td><td>−1.7</td><td>24,108</td><td>Strong Bearish; spot &lt; VWAP &rarr; PE buy</td></tr>
+  <tr><td>13:48</td><td>24,090</td><td>—</td><td>—</td><td>Paper buy 24,100 PE @ ₹95 (cost ₹7,125)</td></tr>
+  <tr><td>14:11</td><td>24,134</td><td>−0.2</td><td>24,107</td><td>P&amp;L = &minus;₹2,925 (40% of cost) &rarr; hard stop hits, exit</td></tr>
+</table>
+
+<h3>Example C: No-trade divergent day</h3>
+<p>OI flow registered <code>net = +1.6</code> for 30 minutes, but spot remained below VWAP throughout. Gate 2 failed every tick. The indicator stayed in <b>Neutral</b> bias and no entries were taken &mdash; capital preserved on what later turned into a sideways grinder. This is the indicator's most valuable behaviour.</p>
+
+<!-- ======================= 19 ======================= -->
+<h2 id="s19" class="pagebreak">19. How to Use the Indicator — Daily Workflow</h2>
+<p>This section walks you through a complete trading day with the indicator, from pre-market preparation through to end-of-session review. Follow it as a checklist for the first 10 sessions until the routine becomes muscle memory.</p>
+
+<h3>19.1 Pre-market (08:45 – 09:14 IST)</h3>
+<ol>
+  <li><b>Open TradingView</b> with two charts side by side:
+    <ul>
+      <li>Left: NIFTY (or BANKNIFTY) <b>5-minute</b> spot chart with VWAP + EMA 9 + EMA 20 overlaid.</li>
+      <li>Right: same instrument <b>3-minute</b> chart for entry triggers.</li>
+    </ul>
+  </li>
+  <li><b>Apply the OI Writing Pressure indicator</b> to a separate sub-pane on the 5-min chart.</li>
+  <li><b>Set the inputs:</b>
+    <ul>
+      <li><code>Underlying</code> = NIFTY</li>
+      <li><code>Expiry suffix</code> = current weekly expiry (e.g. <code>26MAY</code>)</li>
+      <li><code>Manual ATM Strike</code> = previous-day close rounded to nearest 50 (you'll update this at 09:15)</li>
+      <li><code>Lookback</code> = 15</li>
+      <li>Leave all filters ON (skip-open, VWAP, EMA, session-weight)</li>
+    </ul>
+  </li>
+  <li><b>Check the calendar:</b> is today an expiry, RBI policy day, budget day, or major event? If yes &rarr; reduce size to half or skip.</li>
+  <li><b>Note overnight global cues:</b> SGX Nifty, Dow futures, USD/INR. These set the opening bias context.</li>
+  <li><b>Define your daily loss limit</b> &mdash; 2 losing trades in a row = stop for the day.</li>
+</ol>
+
+<h3>19.2 Opening (09:15 – 09:30 IST)</h3>
+<div class="callout warn"><b>Do not trade in the first 15 minutes.</b> The indicator suppresses signals here for good reason &mdash; opening auction noise distorts OI snapshots and VWAP is meaningless on a single bar.</div>
+<ol>
+  <li>Note the actual open price.</li>
+  <li>Round to the nearest 50 (Nifty) or 100 (BankNifty) and update <code>Manual ATM Strike</code> input.</li>
+  <li>Watch the cloud colour (green/red) form &mdash; this is your structural bias for the day.</li>
+  <li>Note where VWAP is settling. Above-VWAP price action favours CE setups; below favours PE.</li>
+</ol>
+
+<h3>19.3 First entry window (09:30 – 11:30 IST)</h3>
+<p>This is the single most reliable window of the day. Most paid prop desks take their highest-conviction shot here.</p>
+<ol>
+  <li><b>Wait for the indicator to print <span class="green">Strong Bullish</span> or <span class="red">Strong Bearish</span></b>. Ignore plain Bullish/Bearish for now &mdash; only act on Strong.</li>
+  <li><b>Confirm the cloud:</b> green cloud for bullish bias, red for bearish. If cloud doesn't agree with the label, pass.</li>
+  <li><b>Switch to the 3-min chart</b> and wait for a price trigger:
+    <ul>
+      <li>Bullish: green-body candle that <b>closes above VWAP</b>.</li>
+      <li>Bearish: red-body candle that <b>closes below VWAP</b>.</li>
+    </ul>
+  </li>
+  <li><b>Enter at the open of the next candle</b> (or wait for a small pullback to VWAP for better R:R).</li>
+  <li><b>Strike: ATM</b> for default size. ATM+1 only if max-rupee cap forces you cheaper.</li>
+  <li><b>Place stop:</b> below the swing low (CE) or above swing high (PE) of the trigger candle. Stop must be such that the rupee-loss at stop is &leq; 40% of capital deployed.</li>
+  <li><b>Set target:</b> +50% of premium paid; trail thereafter.</li>
+</ol>
+
+<h3>19.4 Mid-session (11:30 – 13:30 IST)</h3>
+<ul>
+  <li>Reliability drops here &mdash; lunch lull, lower volume.</li>
+  <li>If you have an open position from the morning, manage it normally (trailing stop, exit on bias flip).</li>
+  <li>Avoid <b>fresh entries</b> unless a divergence label appears AND price gives a strong reversal candle on the 3-min.</li>
+  <li>Take a real break. Walk away from the screen. Decision fatigue is a profit-killer.</li>
+</ul>
+
+<h3>19.5 Second entry window (13:30 – 15:00 IST)</h3>
+<p>Equal-priority window with morning. Often produces the day's best follow-through trades because FII flows rebalance into the close.</p>
+<ol>
+  <li>Same workflow as 19.3.</li>
+  <li>Pay extra attention to <b>divergence labels</b> in this window &mdash; afternoon reversals on a strong morning trend are very common.</li>
+  <li>If you are already up on the day, consider sizing down to half. Protecting a green day is a discipline most traders ignore.</li>
+</ol>
+
+<h3>19.6 Closing (15:00 – 15:30 IST)</h3>
+<div class="callout warn"><b>No new entries after 15:00.</b> Square-off chaos and option premium volatility make late entries unreliable.</div>
+<ol>
+  <li>If you have an open position, exit by 15:15 IST regardless of P&amp;L.</li>
+  <li>Never carry intraday signals overnight &mdash; theta decay alone will eat your edge by morning.</li>
+  <li>Note the final cloud colour and bias &mdash; this informs tomorrow's expected open behaviour.</li>
+</ol>
+
+<h3>19.7 Post-market review (after 15:30)</h3>
+<ol>
+  <li>Open the CSV report from the paper-test module (or your manual trade log).</li>
+  <li>For each signal that fired, mark: was it a winner, loser, or did you skip the entry?</li>
+  <li>For each <b>missed</b> winner, identify why &mdash; was it a gate-failure (filter rejected), a hesitation, or a divergence you didn't act on?</li>
+  <li>For each <b>loser</b>, ask: did all three gates actually pass cleanly, or did you force an entry on a marginal signal?</li>
+  <li>Update a journal with: date, signals fired, entries taken, P&amp;L, and one sentence on lesson learned.</li>
+</ol>
+
+<h3>19.8 The 3-minute decision flow (laminate this)</h3>
+<table>
+  <tr><th>Step</th><th>Question</th><th>If YES</th><th>If NO</th></tr>
+  <tr><td>1</td><td>Is bias <b>Strong</b> Bullish or Bearish?</td><td>Go to step 2</td><td>Wait. Don't trade.</td></tr>
+  <tr><td>2</td><td>Does the cloud colour agree?</td><td>Go to step 3</td><td>Wait — likely choppy.</td></tr>
+  <tr><td>3</td><td>Is the time inside 09:30–11:30 or 13:30–15:00?</td><td>Go to step 4</td><td>Halve size or skip.</td></tr>
+  <tr><td>4</td><td>Did the 3-min trigger candle close on the correct side of VWAP?</td><td>Go to step 5</td><td>Wait for trigger.</td></tr>
+  <tr><td>5</td><td>Will the trade cost &le; ₹15,000 at ATM?</td><td>Enter ATM</td><td>Use ATM+1 (cheaper) or skip.</td></tr>
+  <tr><td>6</td><td>Is your stop ≤ 40% of capital deployed?</td><td>Place order</td><td>Tighten stop or pass.</td></tr>
+</table>
+
+<h3>19.9 Common mistakes to avoid</h3>
+<table>
+  <tr><th>Mistake</th><th>Consequence</th><th>Fix</th></tr>
+  <tr><td>Entering on plain "Bullish/Bearish" (not Strong)</td><td>~50% hit rate, theta bleed eats edge</td><td>Wait for Strong only, especially in first 10 sessions</td></tr>
+  <tr><td>Ignoring the VWAP gate</td><td>Trading divergent setups blindly &rarr; whipsaw</td><td>Always wait for price agreement</td></tr>
+  <tr><td>Averaging down on a losing PE/CE</td><td>Catastrophic loss when option goes to zero</td><td>Never average. Cut at stop. New trade if bias flips.</td></tr>
+  <tr><td>Increasing size after a loss</td><td>Revenge trading &mdash; classic blow-up</td><td>Halve size after any loss for the rest of day</td></tr>
+  <tr><td>Holding past 15:15</td><td>Theta decay overnight + gap risk</td><td>Hard force-flat at 15:15 IST</td></tr>
+  <tr><td>Trading every signal</td><td>Overtrading; commissions and slippage compound</td><td>Cap at 3 trades per day maximum</td></tr>
+</table>
+
+<h3>19.10 Building conviction — the 10-session protocol</h3>
+<ol>
+  <li><b>Sessions 1&ndash;3:</b> Run the paper-test module only. No live trades. Just observe and journal what signals fire and how they would have performed.</li>
+  <li><b>Sessions 4&ndash;6:</b> Continue paper-testing. Begin marking each Strong signal on the chart in real time and writing what you <i>would</i> have done before checking the outcome.</li>
+  <li><b>Sessions 7&ndash;10:</b> If the paper hit-rate is &gt; 55% and average R:R &gt; 1.3, take live trades at <b>quarter</b> size (₹3,750 cap) on Strong signals only.</li>
+  <li><b>Sessions 11+:</b> Scale to half size. Full size only after 30 sessions of consistent journal entries showing positive expectancy.</li>
+</ol>
+
+<div class="callout ok"><b>Discipline beats accuracy.</b> An indicator with 55% accuracy used with strict rules outperforms an indicator with 70% accuracy used carelessly. The workflow above is the value &mdash; the indicator is just the trigger.</div>
+
+<hr>
+<p style="text-align:center; color:#6b7c95; font-size:9pt; margin-top:14pt;">
+  &mdash; End of document &mdash;<br>
+  This indicator is a discretionary aid, not investment advice. Trade at your own risk.
+</p>
+
+</body>
+</html>

@@ -28,6 +28,7 @@ import {
   isAfterMarketSettle,
   nowIST,
 } from "./dateUtils.js";
+import { startOiTest, getOiState, stopOiTest } from "./oiRunner.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const log = pino({ level: process.env.LOG_LEVEL || "info" });
@@ -396,6 +397,37 @@ app.get("/api/angel/download", authMiddleware, (_req, res) => {
       }
     }
   });
+});
+
+// ---------- OI Writing Test endpoints ----------
+// Browser-driven version of src/oiWritingTest.js. Runs in-process; one run
+// at a time. Frontend polls /api/oi/state for newest-first ticks/trades.
+
+app.post("/api/oi/start", authMiddleware, async (req, res) => {
+  const apiKey = req.body.apiKey;
+  if (!apiKey) {
+    return res.status(400).json({ ok: false, error: "apiKey is required" });
+  }
+  try {
+    const out = await startOiTest({
+      jwtToken: req.jwtToken,
+      apiKey,
+      minutes: req.body.minutes,
+      lots: req.body.lots,
+      maxRupees: req.body.maxRupees,
+    });
+    res.json(out);
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/oi/state", authMiddleware, (_req, res) => {
+  res.json({ ok: true, ...getOiState() });
+});
+
+app.post("/api/oi/stop", authMiddleware, (_req, res) => {
+  res.json(stopOiTest());
 });
 
 const port = process.env.PORT || 3000;
