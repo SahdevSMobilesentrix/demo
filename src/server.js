@@ -15,7 +15,6 @@ import {
   fetchQuotes,
   fetchHistoricalDaily,
 } from "./brokers/angelMarketData.js";
-import { getEodFor } from "./brokers/nseBhavcopy.js";
 import {
   planUpdates,
   applyUpdates,
@@ -183,41 +182,10 @@ app.post("/api/angel/generate", authMiddleware, async (req, res) => {
     const dataBySymbolDate = {};
     const todayISO = fmtISO(todayDate);
 
-    // 4a — NSE bhavcopy: authoritative EOD source (matches what the user types
-    // by hand — exact CLOSE_PRICE and AVG_PRICE / VWAP). Try this BEFORE Angel
-    // for every (symbol, date), since Angel candle gives only approximated ATP
-    // and Angel quotes can lag/snapshot during market hours. Bhavcopy publishes
-    // ~18:00 IST so today's file may 404 — that's fine, fall through to 4b/4c.
-    {
-      // Group dates → symbols so we fetch each bhavcopy once.
-      const datesNeeded = new Set();
-      for (const dates of symbolToDates.values()) {
-        for (const d of dates) datesNeeded.add(d);
-      }
-      log.info({ count: datesNeeded.size }, "looking up NSE bhavcopy for dates");
-      for (const isoDate of datesNeeded) {
-        const dateObj = new Date(isoDate + "T00:00:00Z");
-        for (const [sym, dates] of symbolToDates) {
-          if (!dates.has(isoDate)) continue;
-          try {
-            const eod = await getEodFor(sym, dateObj);
-            if (!eod) continue;
-            if (!dataBySymbolDate[sym]) dataBySymbolDate[sym] = {};
-            dataBySymbolDate[sym][isoDate] = eod;
-          } catch (err) {
-            log.warn({ sym, isoDate, err: err.message }, "bhavcopy lookup failed");
-          }
-        }
-      }
-    }
-
-    // 4b — Today's data via FULL quote (exact VWAP), only when target is today
-    //      AND bhavcopy didn't already supply it.
+    // 4a — Today's data via FULL quote, only when target is today.
     const symbolsNeedingToday = [];
     for (const [sym, dates] of symbolToDates) {
-      if (!dates.has(todayISO) || !targetIsToday) continue;
-      if (dataBySymbolDate[sym]?.[todayISO]) continue; // bhavcopy already filled
-      symbolsNeedingToday.push(sym);
+      if (dates.has(todayISO) && targetIsToday) symbolsNeedingToday.push(sym);
     }
     // Track which symbols still need today's data (e.g. indices where avgPrice
     // is 0 / unavailable from the quote API — fallback to historical below).
@@ -257,6 +225,10 @@ app.post("/api/angel/generate", authMiddleware, async (req, res) => {
 
     // 4c — Historical data via candle API (ATP approximated as (O+H+L+C)/4).
     // Fallback ONLY for (sym, date) pairs not already filled by bhavcopy/quote.
+    // Track per-date request/response counts to identify market holidays
+    // (weekdays where multiple symbols were queried but no candle came back).
+    const candleRequestCount = {}; // isoDate -> count of symbols that requested it
+    const candleResponseCount = {}; // isoDate -> count of symbols that received a candle for it
     for (const [sym, datesSet] of symbolToDates) {
       const filled = dataBySymbolDate[sym] || {};
       const dates = [...datesSet].filter((d) => {
@@ -273,6 +245,10 @@ app.post("/api/angel/generate", authMiddleware, async (req, res) => {
       const fromDate = new Date(sortedDates[0] + "T00:00:00Z");
       const toDate = new Date(sortedDates[sortedDates.length - 1] + "T00:00:00Z");
 
+      for (const d of dates) {
+        candleRequestCount[d] = (candleRequestCount[d] || 0) + 1;
+      }
+
       try {
         const candles = await fetchHistoricalDaily(
           req.jwtToken,
@@ -283,6 +259,9 @@ app.post("/api/angel/generate", authMiddleware, async (req, res) => {
         );
         if (!dataBySymbolDate[sym]) dataBySymbolDate[sym] = {};
         for (const c of candles) {
+          if (datesSet.has(c.date)) {
+            candleResponseCount[c.date] = (candleResponseCount[c.date] || 0) + 1;
+          }
           if (!datesSet.has(c.date)) continue;
           // Don't overwrite a value already set from FULL quote (more accurate ATP)
           if (dataBySymbolDate[sym][c.date]) continue;
@@ -305,9 +284,21 @@ app.post("/api/angel/generate", authMiddleware, async (req, res) => {
       await new Promise((r) => setTimeout(r, 350));
     }
 
+    // Identify market holidays: weekdays requested by ≥2 symbols where the
+    // candle API returned NO data for any of them. Threshold avoids
+    // misclassifying single-symbol broker errors as holidays.
+    const holidayDates = new Set();
+    for (const [iso, reqCount] of Object.entries(candleRequestCount)) {
+      const gotCount = candleResponseCount[iso] || 0;
+      if (reqCount >= 2 && gotCount === 0) holidayDates.add(iso);
+    }
+    if (holidayDates.size > 0) {
+      log.info({ holidays: [...holidayDates] }, "detected market holidays");
+    }
+
     // Step 5 — apply updates
     log.info("applying XLSX updates...");
-    const result = applyUpdates(plans, dataBySymbolDate, targetDate);
+    const result = applyUpdates(plans, dataBySymbolDate, targetDate, holidayDates);
 
     res.json({
       ok: true,

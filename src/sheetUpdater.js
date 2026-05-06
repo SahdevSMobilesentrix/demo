@@ -23,6 +23,7 @@ import {
   fmtISO,
   tradingDaysBetween,
   isTradingDay,
+  isWeekend,
 } from "./dateUtils.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -141,15 +142,43 @@ export function planUpdates(targetDate) {
  *
  * @param {Array} plans — output of planUpdates
  * @param {Object} dataBySymbolDate — { [tradingSymbol]: { [YYYY-MM-DD]: { close, atp } } }
- * @returns {{ updatedSheets, alreadyFilled, skippedSheets, missingData, targetDate }}
+ * @param {Set<string>} [holidayDates] — ISO dates (YYYY-MM-DD) confirmed as market holidays
+ * @returns {{ updatedSheets, alreadyFilled, skippedSheets, missingData, clearedRows, targetDate }}
  */
-export function applyUpdates(plans, dataBySymbolDate, targetDate) {
+export function applyUpdates(plans, dataBySymbolDate, targetDate, holidayDates = new Set()) {
   const wb = XLSX.readFile(XLSX_PATH, { cellStyles: true, cellNF: true });
 
   const updatedSheets = []; // { sheet, datesFilled }
   const alreadyFilled = []; // sheets fully up-to-date
   const skippedSheets = []; // { sheet, reason }
   const missingData = []; // { sheet, date, reason }
+  const clearedRows = []; // { sheet, date, reason }
+
+  // Clear pre-populated rows on non-trading days (weekends + known holidays)
+  // so the xlsx doesn't carry blank rows for days the market was shut.
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName];
+    if (!ws || !ws["!ref"]) continue;
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for (let r = 1; r <= range.e.r; r++) {
+      const dateRef = XLSX.utils.encode_cell({ r, c: 0 });
+      const dateCell = ws[dateRef];
+      if (!dateCell || typeof dateCell.v !== "number") continue;
+      const d = serialToDate(dateCell.v);
+      const iso = fmtISO(d);
+      const isHoliday = holidayDates.has(iso);
+      if (!isWeekend(d) && !isHoliday) continue;
+      // Clear date + B..V (close, atp, 2DATP..20DATP) for this row
+      for (let c = 0; c <= 21; c++) {
+        deleteCell(ws, r, c);
+      }
+      clearedRows.push({
+        sheet: sheetName,
+        date: iso,
+        reason: isHoliday ? "market holiday" : "weekend",
+      });
+    }
+  }
 
   for (const plan of plans) {
     if (plan.status === "skipped-override" || plan.tradingSymbol === null) {
@@ -258,6 +287,7 @@ export function applyUpdates(plans, dataBySymbolDate, targetDate) {
     alreadyFilled,
     skippedSheets,
     missingData,
+    clearedRows,
     targetDate: fmtISO(targetDate),
   };
 }
