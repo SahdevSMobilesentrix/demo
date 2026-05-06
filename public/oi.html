@@ -70,6 +70,12 @@
         <a class="tab" href="/dashboard.html">ATP / WEEKLY Sheet</a>
       </div>
 
+      <div class="tabs" id="subTabs" style="margin-top:-8px">
+        <button type="button" class="tab active" data-view="live">Live</button>
+        <button type="button" class="tab" data-view="history">Trade History</button>
+      </div>
+
+      <div id="liveView">
       <div class="card">
         <h3 style="margin:0 0 8px">Start Test</h3>
         <p style="margin:0 0 12px;color:var(--muted);font-size:13px">
@@ -117,6 +123,15 @@
       </div>
 
       <div class="card">
+        <h3 style="margin:0 0 8px">Live Ticks (newest first)</h3>
+        <div class="table-scroll">
+          <div id="tableWrap"><p class="empty">Waiting for ticks…</p></div>
+        </div>
+      </div>
+      </div>
+
+      <div id="historyView" style="display:none">
+      <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <h3 style="margin:0">Day-wise Trade History</h3>
           <button class="ghost" id="refreshHistBtn" type="button" style="padding:6px 12px;font-size:12px">Refresh</button>
@@ -131,12 +146,6 @@
           <div id="histWrap"><p class="empty">No history yet.</p></div>
         </div>
       </div>
-
-      <div class="card">
-        <h3 style="margin:0 0 8px">Live Ticks (newest first)</h3>
-        <div class="table-scroll">
-          <div id="tableWrap"><p class="empty">Waiting for ticks…</p></div>
-        </div>
       </div>
     </div>
 
@@ -465,6 +474,20 @@
       loadHistory();
       // Also refresh history every 30s so newly-closed trades show up.
       setInterval(loadHistory, 30000);
+
+      // ---------- Sub-tab switching (Live / Trade History) ----------
+      const liveView = $("liveView");
+      const historyView = $("historyView");
+      document.querySelectorAll("#subTabs .tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("#subTabs .tab").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          const view = btn.getAttribute("data-view");
+          liveView.style.display = view === "live" ? "" : "none";
+          historyView.style.display = view === "history" ? "" : "none";
+          if (view === "history") loadHistory();
+        });
+      });
     </script>
   </body>
 </html>
