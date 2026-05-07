@@ -3,6 +3,20 @@
 
 import { loadInstruments, fetchQuotes } from "./brokers/angelMarketData.js";
 import { recordTrade } from "./oiHistory.js";
+import { RiskGuard, StateStore } from "./oiGuards.js";
+
+// Persistent capital across runs/days. The "Starting capital" UI value is
+// only used the first time (when no state file exists). After that, the
+// running balance is the source of truth — profits add, losses subtract.
+const stateStore = new StateStore();
+let riskGuard = null;
+function ensureRiskGuard(startingCapital) {
+  if (riskGuard) return riskGuard;
+  riskGuard = new RiskGuard({ startingCapital });
+  const prior = stateStore.load();
+  if (prior?.risk) riskGuard.restore(prior.risk);
+  return riskGuard;
+}
 
 const POLL_SEC = 60;
 const LOOKBACK_MIN = 15;
@@ -12,8 +26,10 @@ const NIFTY_LOT_SIZE = 75;
 // Exit thresholds, expressed as fractions of `maxRupees` (per-trade cap).
 // Tuned for intraday OI-flow scalps — small, frequent moves rather than
 // session-long swings. Edit here to retune.
-const TARGET_FRAC = 0.20; // +20% of cap → exit profit
-const STOP_FRAC   = 0.15; // -15% of cap → exit loss
+// Per-trade SL/TP as fractions of the trade's actual cost (premium paid).
+// Profit target sits inside the 10–15% band; hard loss is capped at 10%.
+const TARGET_FRAC = 0.15; // +15% of trade cost → take profit
+const STOP_FRAC   = 0.10; // -10% of trade cost → cut loss
 
 // Per-day trade caps (counted against IST calendar day):
 //   - Hard cap: at most params.tradesPerDay entries (user-configurable; default 2).
@@ -186,7 +202,7 @@ function maybeEnter(bias, latest, atm) {
     return;
   }
 
-  const { lots, maxRupees } = state.params;
+  const { lots } = state.params;
   let side = null;
   if (bias === "Strong Bullish" || bias === "Bullish") side = "LONG_CE";
   else if (bias === "Strong Bearish" || bias === "Bearish") side = "LONG_PE";
@@ -199,8 +215,12 @@ function maybeEnter(bias, latest, atm) {
     return;
   }
   const cost = px * NIFTY_LOT_SIZE * lots;
-  if (cost > maxRupees) {
-    pushLog(`skip ${side} @ ${px} — cost ₹${round(cost)} > cap ₹${maxRupees}`);
+
+  // Running balance is the source of truth — not a per-day allowance.
+  const bal = riskGuard ? riskGuard.capital : 0;
+  if (cost > bal) {
+    pushLog(`skip ${side} @ ${px} — cost ₹${round(cost)} > balance ₹${round(bal)}`);
+    state.halt = { day: today, reason: "insufficient_capital", message: `Insufficient balance: ₹${round(bal)} available, trade needs ₹${round(cost)}.` };
     return;
   }
   state.openTrade = {
@@ -208,12 +228,13 @@ function maybeEnter(bias, latest, atm) {
     symbol: side === "LONG_CE" ? "NIFTY-ATM-CE" : "NIFTY-ATM-PE",
     entryPx: px, cost,
   };
-  pushLog(`PAPER BUY ${state.openTrade.symbol} strike=${atm} @ ₹${px} cost=₹${round(cost)}`);
+  stateStore.save({ openTrade: state.openTrade, risk: riskGuard?.snapshot() });
+  pushLog(`PAPER BUY ${state.openTrade.symbol} strike=${atm} @ ₹${px} cost=₹${round(cost)} [bal=₹${round(bal)}]`);
 }
 
 function maybeExit(bias, latest, reason = null) {
   if (!state || !state.openTrade) return;
-  const { lots, maxRupees } = state.params;
+  const { lots } = state.params;
   const ot = state.openTrade;
   const key = ot.side === "LONG_CE" ? `${ot.strike}CE` : `${ot.strike}PE`;
   const px = latest.premiumByStrike[key];
@@ -222,8 +243,10 @@ function maybeExit(bias, latest, reason = null) {
   const flipped =
     (ot.side === "LONG_CE" && (bias === "Strong Bearish" || bias === "Bearish")) ||
     (ot.side === "LONG_PE" && (bias === "Strong Bullish" || bias === "Bullish"));
-  const stop = pnl < -maxRupees * STOP_FRAC;
-  const target = pnl > maxRupees * TARGET_FRAC;
+  // Stop/target are anchored to the trade's actual cost (premium paid),
+  // not a phantom per-day allowance.
+  const stop = pnl < -ot.cost * STOP_FRAC;
+  const target = pnl > ot.cost * TARGET_FRAC;
   const why = reason || (flipped ? "BIAS_FLIP" : stop ? "STOP" : target ? "TARGET" : null);
   if (!why) return;
   const dayKey = istDateKey();
@@ -240,14 +263,32 @@ function maybeExit(bias, latest, reason = null) {
     enriched = closed;
   }
   state.trades.unshift(enriched);
-  pushLog(`PAPER EXIT ${ot.symbol} @ ₹${px} P&L=₹${round(pnl)} reason=${why}`);
+
+  // Update running balance with realised P&L (after charges if available).
+  const realised = (enriched && typeof enriched.netPnl === "number") ? enriched.netPnl : pnl;
+  if (riskGuard) {
+    riskGuard.recordExit(realised);
+    stateStore.save({ openTrade: null, risk: riskGuard.snapshot() });
+  }
+  const bal = riskGuard ? riskGuard.capital : null;
+  pushLog(`PAPER EXIT ${ot.symbol} @ ₹${px} P&L=₹${round(pnl)} reason=${why}${bal != null ? ` [bal=₹${round(bal)}]` : ""}`);
+  if (riskGuard?.halted) {
+    pushLog(`RISK HALT: ${riskGuard.haltReason}`);
+    state.halt = { day: istDateKey(), reason: "risk", message: `Risk halt: ${riskGuard.haltReason}` };
+  }
   state.openTrade = null;
 }
 
 export function getOiState() {
-  if (!state) return { status: "idle" };
+  // Always surface the current capital + daily P&L, even when idle, so the
+  // UI can show the running balance before any run starts.
+  if (!state) {
+    const r = riskGuard || (function(){ try { return ensureRiskGuard(15000); } catch { return null; } })();
+    return { status: "idle", risk: r ? r.snapshot() : null };
+  }
   return {
     status: state.status,
+    risk: riskGuard ? riskGuard.snapshot() : null,
     startedAt: state.startedAt,
     endsAt: state.endsAt,
     params: state.params,
@@ -279,6 +320,17 @@ export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, m
   if (!jwtToken || !apiKey) throw new Error("jwtToken and apiKey required");
   const params = { minutes: +minutes, lots: +lots, maxRupees: +maxRupees, tradesPerDay: Math.max(1, +tradesPerDay) };
   state = freshState(params);
+
+  // Initialise / restore running capital. `maxRupees` from the form is treated
+  // as the seed capital used ONLY when there is no prior persisted state.
+  ensureRiskGuard(+maxRupees || 15000);
+  // If there's an open trade persisted from a crashed previous run, surface it.
+  const prior = stateStore.load();
+  if (prior?.openTrade) {
+    state.openTrade = prior.openTrade;
+    pushLog(`restored open trade: ${prior.openTrade.symbol} @ ₹${prior.openTrade.entryPx}`);
+  }
+  pushLog(`capital balance: ₹${round(riskGuard.capital)} (today P&L: ₹${round(riskGuard.dailyPnl)})`);
 
   // Run the loop in the background; surface errors via state.error.
   (async () => {

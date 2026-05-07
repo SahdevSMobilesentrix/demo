@@ -22,6 +22,17 @@ import {
   loadInstruments,
   fetchQuotes,
 } from "./brokers/angelMarketData.js";
+import {
+  GUARDS,
+  Ema,
+  RiskGuard,
+  StateStore,
+  validateTick,
+  premiumExitReason,
+  msUntilNextCandle,
+  trimHistory,
+  inSession,
+} from "./oiGuards.js";
 
 // ---------- CLI args ----------
 const totp = process.argv[2];
@@ -37,8 +48,9 @@ const argMap = Object.fromEntries(
 );
 const RUN_MINUTES = parseInt(argMap.minutes ?? "60", 10);
 const LOTS        = parseInt(argMap.lots ?? "1", 10);
-const MAX_RUPEES  = parseFloat(argMap.maxRupees ?? "15000");
-const POLL_SEC    = 60;
+// Starting capital — only used the FIRST time. After that the running balance
+// is persisted in oi_state.json and carries across sessions/days.
+const STARTING_CAPITAL = parseFloat(argMap.capital ?? argMap.maxRupees ?? "15000");
 const LOOKBACK_MIN = 15;
 const STRIKE_STEP = 50;
 const NIFTY_LOT_SIZE = 75;
@@ -176,31 +188,39 @@ function computeBias(history, latest, priceBull, priceBear) {
 const trades = [];   // { entryTs, side, strike, symbol, entryPx, exitTs, exitPx, pnl, reason }
 let openTrade = null;
 
-function maybeEnter(bias, latest, atm) {
+const riskGuard = new RiskGuard({ startingCapital: STARTING_CAPITAL });
+const stateStore = new StateStore();
+
+function maybeEnter(bias, latest, atm, r) {
   if (openTrade) return;
-  if (bias === "Strong Bullish") {
-    const sym = `NIFTY-ATM-CE`;
-    const px = latest.premiumByStrike[`${atm}CE`];
-    if (!px) return;
-    const cost = px * NIFTY_LOT_SIZE * LOTS;
-    if (cost > MAX_RUPEES) {
-      console.log(`  ⤳ skip BUY ATM CE @ ${px} — cost ₹${round(cost)} > cap ₹${MAX_RUPEES}`);
-      return;
-    }
-    openTrade = { entryTs: latest.ts, side: "LONG_CE", strike: atm, symbol: sym, entryPx: px, cost };
-    console.log(`  ✅ PAPER BUY  ${sym} strike=${atm} @ ₹${px}  cost=₹${round(cost)}`);
-  } else if (bias === "Strong Bearish") {
-    const sym = `NIFTY-ATM-PE`;
-    const px = latest.premiumByStrike[`${atm}PE`];
-    if (!px) return;
-    const cost = px * NIFTY_LOT_SIZE * LOTS;
-    if (cost > MAX_RUPEES) {
-      console.log(`  ⤳ skip BUY ATM PE @ ${px} — cost ₹${round(cost)} > cap ₹${MAX_RUPEES}`);
-      return;
-    }
-    openTrade = { entryTs: latest.ts, side: "LONG_PE", strike: atm, symbol: sym, entryPx: px, cost };
-    console.log(`  ✅ PAPER BUY  ${sym} strike=${atm} @ ₹${px}  cost=₹${round(cost)}`);
+  if (bias !== "Strong Bullish" && bias !== "Strong Bearish") return;
+
+  const side = bias === "Strong Bullish" ? "LONG_CE" : "LONG_PE";
+  const optKey = side === "LONG_CE" ? `${atm}CE` : `${atm}PE`;
+  const sym = side === "LONG_CE" ? `NIFTY-ATM-CE` : `NIFTY-ATM-PE`;
+  const px = latest.premiumByStrike[optKey];
+  const oi = latest.oiByStrike?.[optKey];
+
+  if (!px) return;
+  const cost = px * NIFTY_LOT_SIZE * LOTS;
+
+  const veto = riskGuard.vetoEntry({
+    netFlowAbs: Math.abs(r?.netFlow ?? 0),
+    optionOI: oi,
+    optionPx: px,
+    tradeCost: cost,
+  });
+  if (veto) {
+    console.log(`  ⤳ skip ${side} — veto:${veto}`);
+    return;
   }
+
+  openTrade = {
+    entryTs: latest.ts, side, strike: atm, symbol: sym, entryPx: px, cost,
+    peakPx: px,
+  };
+  stateStore.save({ openTrade, risk: riskGuard.snapshot() });
+  console.log(`  ✅ PAPER BUY  ${sym} strike=${atm} @ ₹${px}  cost=₹${round(cost)}  [bal=₹${round(riskGuard.capital)}]`);
 }
 
 function maybeExit(bias, latest, reason = null) {
@@ -208,23 +228,39 @@ function maybeExit(bias, latest, reason = null) {
   const key = openTrade.side === "LONG_CE" ? `${openTrade.strike}CE` : `${openTrade.strike}PE`;
   const px = latest.premiumByStrike[key];
   if (!px) return;
+
+  // enforce minimum hold so we don't churn on noisy bias flips
+  const heldSec = (latest.ts - openTrade.entryTs) / 1000;
+  const tooEarly = heldSec < GUARDS.minHoldSec;
+
   const pnl = (px - openTrade.entryPx) * NIFTY_LOT_SIZE * LOTS;
   const flipped =
     (openTrade.side === "LONG_CE" && (bias === "Strong Bearish" || bias === "Bearish")) ||
     (openTrade.side === "LONG_PE" && (bias === "Strong Bullish" || bias === "Bullish"));
-  const stop = pnl < -MAX_RUPEES * 0.4;        // -40% of cap
-  const target = pnl > MAX_RUPEES * 0.5;       // +50% of cap
-  const why = reason || (flipped ? "BIAS_FLIP" : stop ? "STOP" : target ? "TARGET" : null);
+  // capital-anchored caps still use entry cost (what was actually risked on this trade)
+  const capStop = pnl < -openTrade.cost * 0.4;
+  const capTarget = pnl > openTrade.cost * 0.5;
+  const premiumReason = premiumExitReason(openTrade, px, latest.ts);
+
+  let why = reason;
+  if (!why && premiumReason) why = premiumReason;          // premium-based stops always win
+  if (!why && !tooEarly && flipped) why = "BIAS_FLIP";
+  if (!why && capStop) why = "CAP_STOP";
+  if (!why && capTarget) why = "CAP_TARGET";
   if (!why) return;
+
   trades.push({ ...openTrade, exitTs: latest.ts, exitPx: px, pnl, reason: why });
-  console.log(`  ❎ PAPER EXIT ${openTrade.symbol} @ ₹${px}  P&L=₹${round(pnl)}  reason=${why}`);
+  riskGuard.recordExit(pnl);
+  stateStore.save({ openTrade: null, risk: riskGuard.snapshot() });
+  console.log(`  ❎ PAPER EXIT ${openTrade.symbol} @ ₹${px}  P&L=₹${round(pnl)}  reason=${why}  [bal=₹${round(riskGuard.capital)}  dayPnl=₹${round(riskGuard.dailyPnl)}]`);
+  if (riskGuard.halted) console.log(`  🛑 RISK HALT: ${riskGuard.haltReason} — no further entries today`);
   openTrade = null;
 }
 
 // ---------- main ----------
 (async () => {
   console.log(`\n=== OI Writing Indicator — Paper Test (READ-ONLY) ===`);
-  console.log(`Run window: ${RUN_MINUTES} min  |  Lots: ${LOTS}  |  Max ₹/trade: ${MAX_RUPEES}\n`);
+  console.log(`Run window: ${RUN_MINUTES} min  |  Lots: ${LOTS}  |  Starting capital (first run only): ₹${STARTING_CAPITAL}\n`);
 
   console.log("→ Logging in to Angel One...");
   const session = await loginAngelOne({
@@ -261,9 +297,16 @@ function maybeExit(bias, latest, reason = null) {
 
   // history of OI snapshots
   const history = [];
-  // VWAP-ish reference: use spot session open as a proxy bullish/bearish filter
-  let sessionOpen = spot;
-  const vwapBuf = [];
+  // EMA replaces the cumulative-mean "VWAP" — same priceBull/priceBear contract
+  const spotEma = new Ema(GUARDS.emaPeriod);
+
+  // restore prior session state if present (crash-safe + carries running balance across days)
+  const prior = stateStore.load();
+  if (prior) {
+    if (prior.openTrade) { openTrade = prior.openTrade; console.log(`  ↻ restored open trade: ${openTrade.symbol} @ ₹${openTrade.entryPx}`); }
+    if (prior.risk) riskGuard.restore(prior.risk);
+  }
+  console.log(`  💰 capital balance: ₹${round(riskGuard.capital)}  (today P&L so far: ₹${round(riskGuard.dailyPnl)})`);
 
   const reportPath = path.join(process.cwd(), `oi_test_report_${Date.now()}.csv`);
   fs.writeFileSync(reportPath,
@@ -280,25 +323,44 @@ function maybeExit(bias, latest, reason = null) {
       ];
       const q = await fetchQuotes(session.jwtToken, ANGEL_API_KEY, tokens);
       const curSpot = q.NIFTY50?.ltp ?? spot;
-      vwapBuf.push(curSpot);
-      const vwap = vwapBuf.reduce((a,b)=>a+b,0) / vwapBuf.length;
-      const priceBull = curSpot > vwap;
-      const priceBear = curSpot < vwap;
+
+      // session window — skip processing entirely outside trading hours
+      if (!inSession()) {
+        console.log(`[${fmtIST()}] outside session — skipping tick`);
+        await new Promise(r => setTimeout(r, msUntilNextCandle()));
+        continue;
+      }
+
+      // quote integrity — reject partial responses (would corrupt OI deltas)
+      const expectedSyms = optTokens.map(t => t.symbol);
+      const integ = validateTick({ q, expectedSymbols: expectedSyms });
+      if (!integ.ok) {
+        console.log(`[${fmtIST()}] tick rejected: ${integ.reason}`);
+        await new Promise(r => setTimeout(r, msUntilNextCandle()));
+        continue;
+      }
+
+      const emaVal = spotEma.push(curSpot);
+      const priceBull = emaVal != null && curSpot > emaVal;
+      const priceBear = emaVal != null && curSpot < emaVal;
 
       let ceTotal = 0, peTotal = 0;
       const premiumByStrike = {};
+      const oiByStrike = {};
       for (const t of optTokens) {
         const row = q[t.symbol];
         if (!row) continue;
         if (row.opnInterest != null) {
           if (t.side === "CE") ceTotal += row.opnInterest;
           else                 peTotal += row.opnInterest;
+          oiByStrike[`${t.strike}${t.side}`] = row.opnInterest;
         }
         premiumByStrike[`${t.strike}${t.side}`] = row.ltp;
       }
 
-      const latest = { ts: Date.now(), ceTotal, peTotal, spot: curSpot, premiumByStrike };
+      const latest = { ts: Date.now(), ceTotal, peTotal, spot: curSpot, premiumByStrike, oiByStrike };
       history.push(latest);
+      trimHistory(history);
 
       const r = computeBias(history, latest, priceBull, priceBear);
 
@@ -312,7 +374,7 @@ function maybeExit(bias, latest, reason = null) {
 
         // exit first (so we can re-enter on flip in same tick)
         maybeExit(r.bias, latest);
-        maybeEnter(r.bias, latest, atm);
+        maybeEnter(r.bias, latest, atm, r);
       }
 
       const tradeNote = openTrade ? `OPEN_${openTrade.side}@${openTrade.strike}` : "";
@@ -323,7 +385,8 @@ function maybeExit(bias, latest, reason = null) {
       console.error(`  ! poll error: ${e.message}`);
     }
 
-    await new Promise(r => setTimeout(r, POLL_SEC * 1000));
+    // candle-aligned scheduling: wake 5s after the next minute boundary
+    await new Promise(r => setTimeout(r, msUntilNextCandle()));
   }
 
   // force-close any open trade at session end

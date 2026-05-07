@@ -1,0 +1,24 @@
+{
+  "openTrade": {
+    "entryTs": 1778139245183,
+    "side": "LONG_PE",
+    "strike": 24450,
+    "symbol": "NIFTY-ATM-PE",
+    "entryPx": 194.7,
+    "cost": 14602.5,
+    "peakPx": 194.7
+  },
+  "risk": {
+    "capital": 15000,
+    "dayStartCapital": 15000,
+    "dailyPnl": 0,
+    "dailyLossLimit": 1500,
+    "dailyLossPct": 10,
+    "tradesToday": 0,
+    "consecLosses": 0,
+    "lastExitTs": 0,
+    "halted": false,
+    "haltReason": null,
+    "dayKey": "2026-05-07"
+  }
+}

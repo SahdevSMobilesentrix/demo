@@ -65,12 +65,7 @@
         <button class="ghost" id="logoutBtn" type="button">Logout</button>
       </div>
 
-      <div class="tabs">
-        <a class="tab active" href="/oi.html">OI Writing Test</a>
-        <a class="tab" href="/dashboard.html">ATP / WEEKLY Sheet</a>
-      </div>
-
-      <div class="tabs" id="subTabs" style="margin-top:-8px">
+      <div class="tabs" id="subTabs">
         <button type="button" class="tab active" data-view="live">Live</button>
         <button type="button" class="tab" data-view="history">Trade History</button>
       </div>
@@ -91,7 +86,7 @@
               <input id="lots" type="number" min="1" value="1" />
             </div>
             <div>
-              <label for="maxRupees">Max ₹/trade</label>
+              <label for="maxRupees" title="Used ONLY the first time. After that the running balance is the source of truth — profits add, losses subtract.">Starting capital ₹ (first run only)</label>
               <input id="maxRupees" type="number" min="100" value="15000" />
             </div>
             <div>
@@ -106,6 +101,7 @@
         </form>
         <div id="status" class="status"></div>
         <div id="haltBanner" class="status" style="display:none;border-color:rgba(245,166,35,.6);background:rgba(245,166,35,.08);color:var(--warn)"></div>
+        <div id="capitalBanner" class="status" style="display:none;border-color:rgba(80,180,120,.5);background:rgba(80,180,120,.08)"></div>
         <div class="info" id="runInfo" style="display:none"></div>
       </div>
 
@@ -331,6 +327,23 @@
         el.innerHTML = '<b>' + icon + ' Trading disabled — ' + escHtml(halt.message) + '</b>';
       }
 
+      function renderCapital(risk) {
+        const el = $("capitalBanner");
+        if (!risk || typeof risk.capital !== "number") { el.style.display = "none"; return; }
+        const inrFmt = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
+        const dayCls = risk.dailyPnl > 0 ? "color:var(--ok,#5ad28a)" : risk.dailyPnl < 0 ? "color:var(--danger,#e96a6a)" : "";
+        el.style.display = "block";
+        const limit = (typeof risk.dailyLossLimit === "number") ? risk.dailyLossLimit : null;
+        const limitTxt = limit != null
+          ? ' / -₹' + inrFmt.format(Math.round(limit)) + ' (' + (risk.dailyLossPct ?? 15) + '%)'
+          : '';
+        el.innerHTML =
+          '💰 <b>Balance: ₹' + inrFmt.format(Math.round(risk.capital * 100) / 100) + '</b>' +
+          ' &nbsp; · &nbsp; Today P&amp;L: <span style="' + dayCls + '">₹' + inrFmt.format(Math.round(risk.dailyPnl * 100) / 100) + '</span>' + limitTxt +
+          ' &nbsp; · &nbsp; Trades today: <b>' + (risk.tradesToday || 0) + '</b>' +
+          (risk.halted ? ' &nbsp; · &nbsp; <span style="color:var(--warn)">HALTED (' + escHtml(risk.haltReason || "") + ')</span>' : "");
+      }
+
       function renderInfo(s) {
         if (s.status === "idle") { runInfo.style.display = "none"; return; }
         runInfo.style.display = "flex";
@@ -351,6 +364,7 @@
           const s = await r.json();
           renderInfo(s);
           renderHalt(s.halt);
+          renderCapital(s.risk);
           renderTicks(s.ticks);
           renderTrades(s.trades, s.openTrade);
           renderLog(s.log);
