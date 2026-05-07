@@ -110,7 +110,10 @@ function computeBias(history, latest, priceBull, priceBear) {
   const net = peN - ceN;
 
   let bias = "Neutral";
-  if (Math.abs(netFlow) > 50000) {
+  // Lowered netFlow gate so the classifier actually fires during typical
+  // intraday OI swings — the previous 50k floor was almost never hit on
+  // ATM±2 NIFTY weeklies, leaving bias stuck at Neutral and no entries.
+  if (Math.abs(netFlow) > 10000) {
     if (net > 1.5 && priceBull)       bias = "Strong Bullish";
     else if (net > 0.5 && priceBull)  bias = "Bullish";
     else if (net < -1.5 && priceBear) bias = "Strong Bearish";
@@ -185,13 +188,16 @@ function maybeEnter(bias, latest, atm) {
 
   const { lots, maxRupees } = state.params;
   let side = null;
-  if (bias === "Strong Bullish") side = "LONG_CE";
-  else if (bias === "Strong Bearish") side = "LONG_PE";
+  if (bias === "Strong Bullish" || bias === "Bullish") side = "LONG_CE";
+  else if (bias === "Strong Bearish" || bias === "Bearish") side = "LONG_PE";
   if (!side) return;
 
   const key = side === "LONG_CE" ? `${atm}CE` : `${atm}PE`;
   const px = latest.premiumByStrike[key];
-  if (!px) return;
+  if (!px) {
+    pushLog(`skip ${side} — no premium for ${key}`);
+    return;
+  }
   const cost = px * NIFTY_LOT_SIZE * lots;
   if (cost > maxRupees) {
     pushLog(`skip ${side} @ ${px} — cost ₹${round(cost)} > cap ₹${maxRupees}`);
