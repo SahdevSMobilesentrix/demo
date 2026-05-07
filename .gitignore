@@ -2,3 +2,31 @@ node_modules/
 .env
 .env.local
 *.log
+
+# ----------------------------------------------------------------------
+# Runtime / data files — DO NOT COMMIT.
+# These are written by the bot at runtime and represent live trading state.
+# Committing & pushing would overwrite the user's persistent balance, trade
+# history, and open positions on the server every deploy.
+# ----------------------------------------------------------------------
+
+# Trade history flat-file DB (and any future siblings inside data/)
+data/
+
+# Persistent capital + open-trade state (used by oiRunner & oiWritingTest)
+oi_state.json
+oi_state.*.json
+
+# Per-session paper-test CSV reports written by oiWritingTest.js
+oi_test_report_*.csv
+
+# Legacy JSON history (pre-txt DB) — keep server-side, never re-deploy
+oi_trades.json
+
+# Persisted OI snapshot history & UI tick log (used to bypass the 15-min
+# warmup after a server restart / deploy). These are runtime caches —
+# never commit, otherwise a push would replace live data with stale data.
+oi_history.json
+oi_ticks.json
+oi_history.json.tmp
+oi_ticks.json.tmp

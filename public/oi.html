@@ -55,7 +55,48 @@
       .log{max-height:140px;overflow:auto;font:11.5px/1.4 ui-monospace,Menlo,monospace;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px}
       .log div{margin-bottom:2px}
       .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-      @media (max-width:780px){.grid-2{grid-template-columns:1fr}.row{grid-template-columns:1fr 1fr}}
+
+      /* ---------- mobile-first responsive ---------- */
+      @media (max-width:900px){
+        .wrap{padding:18px 14px}
+        .grid-2{grid-template-columns:1fr}
+      }
+      @media (max-width:640px){
+        body{font-size:14px}
+        .wrap{padding:14px 10px}
+        h1{font-size:18px}
+        .topbar{flex-wrap:wrap;gap:8px;margin-bottom:12px}
+        .topbar h1{flex:1 1 auto;min-width:0}
+        .card{padding:14px;margin-bottom:12px;border-radius:12px}
+        .tabs{gap:4px;margin-bottom:12px;flex-wrap:wrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+        .tab{padding:8px 12px;font-size:13px}
+        .row,
+        .row[style]{grid-template-columns:1fr 1fr !important;gap:10px}
+        .row .totp-cell{grid-column:1 / -1}
+        .actions{flex-wrap:wrap}
+        .actions button{flex:1 1 auto;min-width:120px}
+        button{padding:11px 14px;font-size:14px;width:100%}
+        .actions button{width:auto}
+        input{font-size:16px;padding:11px 12px}    /* 16px prevents iOS zoom-on-focus */
+        input.totp{font-size:18px;letter-spacing:4px}
+        label{font-size:10.5px}
+        .info{gap:10px;font-size:12.5px}
+        .status{padding:10px;font-size:12.5px}
+        .table-scroll{max-height:340px}
+        table{font-size:11.5px}
+        th,td{padding:5px 7px}
+        th{font-size:9.5px}
+        .badge{font-size:9.5px;padding:1px 5px}
+        .log{max-height:120px;font-size:10.5px;padding:8px}
+      }
+      @media (max-width:380px){
+        .row,
+        .row[style]{grid-template-columns:1fr !important}
+        .row .totp-cell{grid-column:1}
+      }
+      /* horizontal-scroll table on touch */
+      .table-scroll{ -webkit-overflow-scrolling:touch }
+      .table-scroll table{min-width:max-content}
     </style>
   </head>
   <body>

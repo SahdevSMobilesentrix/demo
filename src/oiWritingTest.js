@@ -27,6 +27,7 @@ import {
   Ema,
   RiskGuard,
   StateStore,
+  HistoryStore,
   validateTick,
   premiumExitReason,
   msUntilNextCandle,
@@ -295,8 +296,13 @@ function maybeExit(bias, latest, reason = null) {
   if (optTokens.length === 0) throw new Error("No option tokens resolved for ATM±2");
   console.log(`  ✓ resolved ${optTokens.length} option tokens (CE+PE × ATM±2)\n`);
 
-  // history of OI snapshots
-  const history = [];
+  // history of OI snapshots — restored from disk so warmup doesn't restart
+  // from scratch after a process restart / git push.
+  const historyStore = new HistoryStore();
+  const persistedHistory = historyStore.load();
+  const cutoffMs = Date.now() - LOOKBACK_MIN * 60 * 1000 * 4;
+  const history = persistedHistory.filter(h => h && typeof h.ts === "number" && h.ts >= cutoffMs);
+  if (history.length > 0) console.log(`  ↻ resumed ${history.length} OI snapshots from disk (warmup bypassed)`);
   // EMA replaces the cumulative-mean "VWAP" — same priceBull/priceBear contract
   const spotEma = new Ema(GUARDS.emaPeriod);
 
@@ -308,7 +314,11 @@ function maybeExit(bias, latest, reason = null) {
   }
   console.log(`  💰 capital balance: ₹${round(riskGuard.capital)}  (today P&L so far: ₹${round(riskGuard.dailyPnl)})`);
 
-  const reportPath = path.join(process.cwd(), `oi_test_report_${Date.now()}.csv`);
+  // Write the CSV report into the runtime data dir (Render persistent disk
+  // when DATA_DIR is set). Project root is ephemeral on hosted platforms.
+  const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
+  fs.mkdirSync(dataDir, { recursive: true });
+  const reportPath = path.join(dataDir, `oi_test_report_${Date.now()}.csv`);
   fs.writeFileSync(reportPath,
     "ts,spot,atm,ceTotal,peTotal,ceDelta,peDelta,netFlow,pcrOI,ceN,peN,net,bias,strength,priceBull,priceBear,trade\n"
   );
@@ -361,6 +371,7 @@ function maybeExit(bias, latest, reason = null) {
       const latest = { ts: Date.now(), ceTotal, peTotal, spot: curSpot, premiumByStrike, oiByStrike };
       history.push(latest);
       trimHistory(history);
+      historyStore.save(history);
 
       const r = computeBias(history, latest, priceBull, priceBear);
 

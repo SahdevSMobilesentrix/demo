@@ -3,12 +3,18 @@
 
 import { loadInstruments, fetchQuotes } from "./brokers/angelMarketData.js";
 import { recordTrade } from "./oiHistory.js";
-import { RiskGuard, StateStore } from "./oiGuards.js";
+import { RiskGuard, StateStore, HistoryStore, TickStore } from "./oiGuards.js";
 
 // Persistent capital across runs/days. The "Starting capital" UI value is
 // only used the first time (when no state file exists). After that, the
 // running balance is the source of truth — profits add, losses subtract.
 const stateStore = new StateStore();
+// Persisted OI snapshots — survives server restart so warmup doesn't
+// restart from scratch after a deploy.
+const historyStore = new HistoryStore();
+// Persisted UI tick rows — so the page after refresh / restart still
+// shows the most recent activity instead of going blank.
+const tickStore = new TickStore();
 let riskGuard = null;
 function ensureRiskGuard(startingCapital) {
   if (riskGuard) return riskGuard;
@@ -284,7 +290,14 @@ export function getOiState() {
   // UI can show the running balance before any run starts.
   if (!state) {
     const r = riskGuard || (function(){ try { return ensureRiskGuard(15000); } catch { return null; } })();
-    return { status: "idle", risk: r ? r.snapshot() : null };
+    // Show the last persisted ticks so a browser refresh / server restart
+    // doesn't visually wipe the recent activity.
+    const persistedTicks = tickStore.load();
+    return {
+      status: "idle",
+      risk: r ? r.snapshot() : null,
+      ticks: persistedTicks.slice(0, 500),
+    };
   }
   return {
     status: state.status,
@@ -359,7 +372,19 @@ export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, m
       if (optTokens.length === 0) throw new Error("No option tokens resolved for ATM±2");
       pushLog(`spot=${spot} ATM=${atm} expiry=${expiry.str} options=${optTokens.length}`);
 
-      const history = [];
+      // Resume snapshot history & tick log from disk — bypasses warmup if
+      // recent enough snapshots survive across restarts/deploys.
+      const persistedHistory = historyStore.load();
+      const cutoffMs = Date.now() - LOOKBACK_MIN * 60 * 1000 * 4;   // keep up to 4× lookback
+      const history = persistedHistory.filter(h => h && typeof h.ts === "number" && h.ts >= cutoffMs);
+      if (history.length > 0) {
+        pushLog(`resumed ${history.length} OI snapshots from disk (warmup bypassed)`);
+      }
+      const persistedTicks = tickStore.load();
+      if (persistedTicks.length > 0) {
+        // Newest-first; cap to UI limit.
+        state.ticks = persistedTicks.slice(0, 1000);
+      }
       const vwapBuf = [];
       state.status = "running";
 
@@ -390,6 +415,9 @@ export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, m
 
           const latest = { ts: Date.now(), ceTotal, peTotal, spot: curSpot, premiumByStrike };
           history.push(latest);
+          // Trim in-memory + persist so the warmup window survives restarts.
+          if (history.length > 240) history.splice(0, history.length - 240);
+          historyStore.save(history);
           const r = computeBias(history, latest, priceBull, priceBear);
 
           // Newest-first into state.ticks
@@ -409,6 +437,9 @@ export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, m
             tradeNote: state.openTrade ? `OPEN_${state.openTrade.side}@${state.openTrade.strike}` : "",
           });
           if (state.ticks.length > 1000) state.ticks.length = 1000;
+          // Persist UI ticks (cap to 500 for disk size) so a refresh / restart
+          // doesn't show an empty table.
+          tickStore.save(state.ticks.slice(0, 500));
 
           if (r.ready) {
             maybeExit(r.bias, latest);

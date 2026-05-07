@@ -74,6 +74,21 @@
       .actions { display: flex; gap: 10px; margin-top: 20px; }
       .actions button { flex: 1; }
 
+      /* mobile responsive */
+      @media (max-width: 640px) {
+        body { font-size: 14px; }
+        .wrap { padding: 28px 14px; }
+        h1 { font-size: 22px; }
+        .card { padding: 16px; }
+        .modal { padding: 18px; border-radius: 12px; }
+        .modal h2 { font-size: 18px; }
+        input { font-size: 16px; padding: 12px 13px; }   /* prevents iOS focus zoom */
+        input.totp { font-size: 20px; letter-spacing: 6px; }
+        button { padding: 12px 14px; }
+        .actions { flex-wrap: wrap; }
+        .actions button { flex: 1 1 140px; }
+      }
+
       .status {
         margin-top: 18px; padding: 14px; border-radius: 10px; font-size: 14px;
         background: var(--panel-2); border: 1px solid var(--border); display: none;

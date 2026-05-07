@@ -15,5 +15,3 @@ services:
         value: 20
       - key: DATA_DIR
         value: /data
-      - key: SEED_FILE
-        value: ./seed/WEEKLY_FNO.xlsx

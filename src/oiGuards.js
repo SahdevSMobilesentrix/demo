@@ -9,6 +9,15 @@
 import fs from "fs";
 import path from "path";
 
+// Resolve the runtime data directory. On Render (and similar PaaS) the
+// project filesystem is ephemeral — every deploy starts a fresh container
+// and wipes anything written under the repo path. The persistent disk is
+// mounted at /data (set via DATA_DIR env). Local dev falls back to ./data.
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+function dataPath(name) {
+  return path.join(DATA_DIR, name);
+}
+
 // -------------------- tunables --------------------
 export const GUARDS = {
   // session window (IST minutes since midnight)
@@ -244,7 +253,7 @@ export function msUntilNextCandle(now = Date.now(), offsetMs = 5000) {
 // -------------------- State persistence --------------------
 export class StateStore {
   constructor(filePath) {
-    this.filePath = filePath || path.join(process.cwd(), "oi_state.json");
+    this.filePath = filePath || dataPath("oi_state.json");
   }
   load() {
     try {
@@ -271,4 +280,51 @@ export class StateStore {
 // -------------------- history trim --------------------
 export function trimHistory(history, maxLen = GUARDS.historyMaxLen) {
   if (history.length > maxLen) history.splice(0, history.length - maxLen);
+}
+
+// -------------------- HistoryStore --------------------
+// Persists the rolling OI snapshot history so that:
+//   1. Warmup never restarts from scratch after a server restart / git push.
+//      As long as some snapshots are within `LOOKBACK_MIN`, computeBias is
+//      ready immediately.
+//   2. The UI tick table can show the prior session even when the runner
+//      is idle (e.g. user refreshes the page).
+//
+// Stored as a single JSON array on disk (small file, simple, crash-safe via
+// rename). One file per concern: history (full snapshots) and ticks
+// (UI-friendly per-poll rows).
+export class HistoryStore {
+  constructor(filePath) {
+    this.filePath = filePath || dataPath("oi_history.json");
+  }
+  load() {
+    try {
+      if (!fs.existsSync(this.filePath)) return [];
+      const arr = JSON.parse(fs.readFileSync(this.filePath, "utf8"));
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      console.error("HistoryStore.load:", e.message);
+      return [];
+    }
+  }
+  save(history) {
+    try {
+      fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+      // atomic-ish: write to .tmp then rename so a crash mid-write doesn't
+      // corrupt the file (an empty / partial file would force a warmup).
+      const tmp = this.filePath + ".tmp";
+      fs.writeFileSync(tmp, JSON.stringify(history));
+      fs.renameSync(tmp, this.filePath);
+    } catch (e) {
+      console.error("HistoryStore.save:", e.message);
+    }
+  }
+}
+
+// TickStore — same shape but for the UI tick rows (newest-first, capped).
+// Kept separate from HistoryStore because the contents and consumers differ.
+export class TickStore extends HistoryStore {
+  constructor(filePath) {
+    super(filePath || dataPath("oi_ticks.json"));
+  }
 }

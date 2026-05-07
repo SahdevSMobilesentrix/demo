@@ -16,7 +16,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, "..", "data", "oi_trades.txt");
+// Use DATA_DIR (set by Render to /data — the persistent disk mount) when
+// available; otherwise fall back to ./data in the project root for local dev.
+// CRITICAL: on hosted platforms the project filesystem is ephemeral, so
+// writing under the repo path silently loses every byte on each deploy.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "..", "data");
+const DB_PATH = path.join(DATA_DIR, "oi_trades.txt");
 const SEP = "|";
 
 // IMPORTANT: append-only — never reorder or rename. Add new columns at the end
