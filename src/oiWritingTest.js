@@ -63,6 +63,17 @@ if (!ANGEL_API_KEY || !ANGEL_CLIENT_CODE || !ANGEL_PIN) {
 }
 
 // ---------- helpers ----------
+function cleanupOldReports(dir) {
+  try {
+    const files = fs.readdirSync(dir)
+      .filter(f => /^oi_test_report_\d+\.csv$/.test(f));
+    for (const f of files) {
+      try { fs.unlinkSync(path.join(dir, f)); } catch {}
+    }
+    if (files.length) console.log(`  🧹 cleared ${files.length} old CSV report(s)`);
+  } catch {}
+}
+
 const istNow = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
 const fmtIST = (d = istNow()) => d.toTimeString().slice(0, 8);
 const round = (v, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
@@ -318,6 +329,7 @@ function maybeExit(bias, latest, reason = null) {
   // when DATA_DIR is set). Project root is ephemeral on hosted platforms.
   const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
   fs.mkdirSync(dataDir, { recursive: true });
+  cleanupOldReports(dataDir);
   const reportPath = path.join(dataDir, `oi_test_report_${Date.now()}.csv`);
   fs.writeFileSync(reportPath,
     "ts,spot,atm,ceTotal,peTotal,ceDelta,peDelta,netFlow,pcrOI,ceN,peN,net,bias,strength,priceBull,priceBear,trade\n"
