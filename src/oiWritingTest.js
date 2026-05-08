@@ -110,7 +110,8 @@ function parseExpiry(s) {
 }
 
 function pickStrikes(instruments, expiryStr, atm) {
-  const wanted = [-2, -1, 0, 1, 2].map((k) => atm + k * STRIKE_STEP);
+  // ATM ± 3 = 7 strikes (14 contracts).
+  const wanted = [-3, -2, -1, 0, 1, 2, 3].map((k) => atm + k * STRIKE_STEP);
   const out = [];
   for (const strike of wanted) {
     for (const side of ["CE", "PE"]) {
@@ -304,8 +305,8 @@ function maybeExit(bias, latest, reason = null) {
   console.log(`  ✓ nearest expiry: ${expiry.str}`);
 
   const optTokens = pickStrikes(instruments, expiry.str, atm);
-  if (optTokens.length === 0) throw new Error("No option tokens resolved for ATM±2");
-  console.log(`  ✓ resolved ${optTokens.length} option tokens (CE+PE × ATM±2)\n`);
+  if (optTokens.length === 0) throw new Error("No option tokens resolved for ATM±3");
+  console.log(`  ✓ resolved ${optTokens.length} option tokens (CE+PE × ATM±3)\n`);
 
   // history of OI snapshots — restored from disk so warmup doesn't restart
   // from scratch after a process restart / git push.

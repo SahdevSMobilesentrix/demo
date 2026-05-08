@@ -56,20 +56,26 @@
       .log div{margin-bottom:2px}
       .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 
-      /* ---------- mobile-first responsive ---------- */
+      /* ---------- responsive: tablet (≤900px) ---------- */
       @media (max-width:900px){
         .wrap{padding:18px 14px}
         .grid-2{grid-template-columns:1fr}
+        /* Inline-styled grids inside histTotals & strategy doc relax their
+           minmax floor so cards stack cleanly on narrower tablets. */
+        #histTotals > div{grid-template-columns:repeat(auto-fit,minmax(220px,1fr)) !important}
+        #histTotals > div > div{grid-template-columns:repeat(auto-fit,minmax(120px,1fr)) !important}
       }
+      /* ---------- responsive: phone (≤640px) ---------- */
       @media (max-width:640px){
         body{font-size:14px}
         .wrap{padding:14px 10px}
         h1{font-size:18px}
         .topbar{flex-wrap:wrap;gap:8px;margin-bottom:12px}
-        .topbar h1{flex:1 1 auto;min-width:0}
+        .topbar h1{flex:1 1 auto;min-width:0;font-size:17px}
         .card{padding:14px;margin-bottom:12px;border-radius:12px}
-        .tabs{gap:4px;margin-bottom:12px;flex-wrap:wrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
-        .tab{padding:8px 12px;font-size:13px}
+        .tabs{gap:4px;margin-bottom:12px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+        .tabs::-webkit-scrollbar{display:none}
+        .tab{padding:8px 12px;font-size:13px;flex:0 0 auto;white-space:nowrap}
         .row,
         .row[style]{grid-template-columns:1fr 1fr !important;gap:10px}
         .row .totp-cell{grid-column:1 / -1}
@@ -81,22 +87,43 @@
         input.totp{font-size:18px;letter-spacing:4px}
         label{font-size:10.5px}
         .info{gap:10px;font-size:12.5px}
-        .status{padding:10px;font-size:12.5px}
+        .status{padding:10px;font-size:12.5px;word-break:break-word}
         .table-scroll{max-height:340px}
         table{font-size:11.5px}
         th,td{padding:5px 7px}
         th{font-size:9.5px}
         .badge{font-size:9.5px;padding:1px 5px}
-        .log{max-height:120px;font-size:10.5px;padding:8px}
+        .log{max-height:120px;font-size:10.5px;padding:8px;word-break:break-word}
+        /* histTotals cards: full-width on phones, tight gap */
+        #histTotals > div{grid-template-columns:1fr !important;gap:8px !important}
+        #histTotals > div > div{grid-template-columns:repeat(2,1fr) !important;gap:8px !important}
+        /* Strategy doc readability on phones */
+        #strategyView h2{font-size:18px}
+        #strategyView h3{font-size:15px;margin:14px 0 4px !important}
+        #strategyView p,#strategyView li{font-size:13.5px}
+        #strategyView ul,#strategyView ol{margin-left:18px !important;padding-left:0}
+        #strategyView table{font-size:12px}
+        #strategyView table th,#strategyView table td{padding:6px 6px !important;white-space:normal;word-break:break-word}
       }
-      @media (max-width:380px){
+      /* ---------- responsive: small phones (≤420px) ---------- */
+      @media (max-width:420px){
+        .wrap{padding:12px 8px}
+        h1{font-size:16px}
         .row,
         .row[style]{grid-template-columns:1fr !important}
         .row .totp-cell{grid-column:1}
+        .topbar #logoutBtn{padding:8px 12px;font-size:13px}
+        .tab{padding:7px 10px;font-size:12.5px}
+        .card{padding:12px}
+        #histTotals > div > div{grid-template-columns:1fr !important}
+        #strategyView h2{font-size:16px}
+        #strategyView h3{font-size:14px}
       }
       /* horizontal-scroll table on touch */
       .table-scroll{ -webkit-overflow-scrolling:touch }
       .table-scroll table{min-width:max-content}
+      /* All raw text inside cards stays inside the card on narrow widths */
+      .card{overflow-wrap:break-word}
     </style>
   </head>
   <body>
@@ -106,9 +133,16 @@
         <button class="ghost" id="logoutBtn" type="button">Logout</button>
       </div>
 
+      <div style="margin:8px 0 12px;padding:8px 12px;border:1px solid rgba(245,166,35,.4);background:rgba(245,166,35,.08);border-radius:8px;color:var(--warn);font-size:12px;line-height:1.4">
+        <b>Disclaimer:</b> I am <b>not</b> a SEBI-registered research analyst or investment adviser.
+        This tool is for <b>educational and paper-trading purposes only</b> — not investment advice or a recommendation to buy/sell.
+        Trade at your own risk; F&amp;O carries substantial risk of loss.
+      </div>
+
       <div class="tabs" id="subTabs">
         <button type="button" class="tab active" data-view="live">Live</button>
         <button type="button" class="tab" data-view="history">Trade History</button>
+        <button type="button" class="tab" data-view="strategy">Strategy</button>
       </div>
 
       <div id="liveView">
@@ -132,7 +166,7 @@
             </div>
             <div>
               <label for="tradesPerDay">Trades / day</label>
-              <input id="tradesPerDay" type="number" min="1" max="10" value="2" />
+              <input id="tradesPerDay" type="number" min="1" max="10" value="1" />
             </div>
           </div>
           <div class="actions">
@@ -184,6 +218,120 @@
         </div>
       </div>
       </div>
+
+      <div id="strategyView" style="display:none">
+      <div class="card" style="line-height:1.65">
+        <h2 style="margin:0 0 6px">How This Bot Trades — In Plain English</h2>
+        <p style="margin:0 0 18px;color:var(--muted);font-size:13px">
+          This page explains exactly what the bot watches, when it enters, when it exits, and what safety rules stop it from blowing up. No jargon — just rules.
+        </p>
+
+        <h3 style="margin:18px 0 6px">1. What is this bot doing?</h3>
+        <p style="margin:0 0 10px">
+          Every minute, the bot looks at the NIFTY option chain (Calls and Puts around the at-the-money strike) and asks one question:
+          <b>“Are big players writing Puts or writing Calls right now?”</b>
+        </p>
+        <ul style="margin:0 0 10px 18px;padding:0">
+          <li><b>Heavy Put writing + Call covering</b> → big players expect price to go up → <b>buy a Call (CE)</b>.</li>
+          <li><b>Heavy Call writing + Put covering</b> → big players expect price to go down → <b>buy a Put (PE)</b>.</li>
+          <li>If the picture is mixed or quiet, the bot does <b>nothing</b>.</li>
+        </ul>
+        <p style="margin:0 0 10px">
+          It is a <b>paper-trading bot</b>. No real orders are placed. P&amp;L is simulated using live premiums and realistic broker charges (brokerage, STT, exchange txn, SEBI, stamp duty, GST).
+        </p>
+
+        <h3 style="margin:18px 0 6px">2. The numbers on the Live tab — what each one means</h3>
+        <table style="width:100%;border-collapse:collapse;margin:0 0 10px">
+          <thead><tr style="text-align:left;color:var(--muted);font-size:12px">
+            <th style="padding:6px 8px;border-bottom:1px solid var(--border)">Column</th>
+            <th style="padding:6px 8px;border-bottom:1px solid var(--border)">Plain meaning</th>
+          </tr></thead>
+          <tbody style="font-size:13px">
+            <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border)"><b>NIFTY Spot</b></td><td style="padding:6px 8px;border-bottom:1px solid var(--border)">Live NIFTY index price at this minute.</td></tr>
+            <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border)"><b>Total Call OI / Put OI</b></td><td style="padding:6px 8px;border-bottom:1px solid var(--border)">How many Call / Put contracts are open across the strikes we watch. Shown in <b>Lakh (L)</b> or <b>Crore (Cr)</b>.</td></tr>
+            <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border)"><b>Call OI Change / Put OI Change</b></td><td style="padding:6px 8px;border-bottom:1px solid var(--border)">How much OI has moved in the last 15 minutes. Positive = fresh writing; negative = unwinding/covering.</td></tr>
+            <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border)"><b>Net OI Flow</b></td><td style="padding:6px 8px;border-bottom:1px solid var(--border)">Put OI Change minus Call OI Change. <b>Positive = bullish flow</b>, <b>Negative = bearish flow</b>.</td></tr>
+            <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border)"><b>PCR</b></td><td style="padding:6px 8px;border-bottom:1px solid var(--border)">Put OI ÷ Call OI. Above 1 = puts dominate (often bullish). Below 1 = calls dominate (often bearish).</td></tr>
+            <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border)"><b>Signal</b></td><td style="padding:6px 8px;border-bottom:1px solid var(--border)">A normalised score (z-score). <code>+1.5</code> or higher = strongly bullish, <code>−1.5</code> or lower = strongly bearish, in between = mild/noise. Scaled by recent volatility, so a "big" move on a quiet day still looks big.</td></tr>
+            <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border)"><b>Confidence</b></td><td style="padding:6px 8px;border-bottom:1px solid var(--border)">The Signal value rescaled to 0–100%. Just an easier-to-read version of the same thing.</td></tr>
+            <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border)"><b>Market Bias</b></td><td style="padding:6px 8px;border-bottom:1px solid var(--border)">The bot's verdict: <b>Strong Bullish / Bullish / Neutral / Bearish / Strong Bearish</b>. Computed from Signal + price action.</td></tr>
+            <tr><td style="padding:6px 8px"><b>Trade Action</b></td><td style="padding:6px 8px">Whatever the bot did on this tick: <code>OPEN_LONG_CE@…</code>, <code>EXIT_…</code>, or blank.</td></tr>
+          </tbody>
+        </table>
+
+        <h3 style="margin:18px 0 6px">3. When does the bot ENTER a trade?</h3>
+        <p style="margin:0 0 8px">All four of these must be true at the same time. If even one fails, no trade.</p>
+        <ol style="margin:0 0 10px 18px;padding:0">
+          <li><b>Strong bias only.</b> Bias must be <b>Strong Bullish</b> (for a Call) or <b>Strong Bearish</b> (for a Put). Mild "Bullish/Bearish" is rejected — too noisy.</li>
+          <li><b>3 ticks of confirmation.</b> The last 3 ticks (≈ 3 minutes) must <b>all agree</b> on the same Strong bias. One green tick is not enough — the bot waits for the move to hold.</li>
+          <li><b>Price must have broken the strike.</b> For a Call, NIFTY spot must be <b>above</b> the at-the-money strike for at least 2 ticks. For a Put, spot must be <b>below</b> the strike. No buying into resistance.</li>
+          <li><b>Which strike is bought:</b> Once all gates pass, the bot buys the <b>1-step in-the-money (ITM)</b> option, not ATM. For a Call, that's the strike <b>50 points below</b> spot (e.g. ATM 24200 → buy 24150 CE). For a Put, the strike <b>50 points above</b> spot (e.g. ATM 24200 → buy 24250 PE). ITM has higher delta (~0.6 vs 0.5), less theta-as-percent, and intrinsic value cushions small adverse moves — better risk-reward than buying naked ATM premium.</li>
+          <li><b>Momentum must still be moving in our direction.</b> Latest spot must be making progress (higher for Calls, lower for Puts) compared to the start of the 3-tick window. No entering on a stall.</li>
+        </ol>
+        <p style="margin:0 0 10px;color:var(--muted);font-size:12.5px">
+          When any of these checks fail, the Server Log will say something like <code>skip LONG_CE — no sustained breakout of 24200</code>. That's the bot doing its job.
+        </p>
+
+        <h3 style="margin:18px 0 6px">4. When does the bot EXIT?</h3>
+        <p style="margin:0 0 8px">A trade closes the moment ANY of these is true:</p>
+        <ul style="margin:0 0 10px 18px;padding:0">
+          <li><b>Target hit (+15%).</b> Premium has risen 15% above what we paid → take profit.</li>
+          <li><b>Stop hit (−10%).</b> Premium has dropped 10% below what we paid → cut the loss.</li>
+          <li><b>Bias flips.</b> If we are long a Call and bias turns Bearish (or long a Put and bias turns Bullish) → exit immediately.</li>
+          <li><b>Bias decays.</b> If 2 consecutive ticks after entry lose the original Strong bias (drop to Neutral / mild) → exit. Don't sit in a fading move.</li>
+          <li><b>Session end.</b> Any open position is force-closed at the last available premium when the run window ends.</li>
+        </ul>
+
+        <h3 style="margin:18px 0 6px">5. Daily safety rules (so the bot can't blow up)</h3>
+        <ul style="margin:0 0 10px 18px;padding:0">
+          <li><b>Trades per day cap.</b> Default <b>1</b> trade/day. Configurable in the Live tab. Once hit, no more entries until tomorrow.</li>
+          <li><b>First-loss lockout.</b> If your first trade of the day closes at a loss, the bot is <b>done for the day</b> — no second trade. (Cuts revenge-trading.)</li>
+          <li><b>Daily loss limit: 10%.</b> If realised P&amp;L for the day reaches −10% of capital, the bot halts until next IST day.</li>
+          <li><b>Cooldown after exit.</b> A short pause after every exit before considering a new entry — stops back-to-back fakes.</li>
+          <li><b>Session phase.</b> No entries before 09:15 IST or after 15:30 IST. No entries during pre-open or post-close.</li>
+          <li><b>Insufficient balance check.</b> If the trade cost exceeds the running balance, the bot refuses to enter and shows a banner.</li>
+        </ul>
+
+        <h3 style="margin:18px 0 6px">6. How money is tracked</h3>
+        <ul style="margin:0 0 10px 18px;padding:0">
+          <li><b>Starting capital</b> is used <b>only the very first time</b>. After that, the running balance is the source of truth — wins add, losses subtract.</li>
+          <li>Each closed trade is enriched with <b>realistic charges</b> (brokerage, STT, exchange txn, SEBI fees, stamp duty, GST) on the Trade History tab.</li>
+          <li><b>Net P&amp;L</b> shown anywhere = Gross P&amp;L − all charges. That's what actually hits the wallet.</li>
+          <li>The running balance is persisted on the server, so even if you restart, yesterday's results carry over.</li>
+        </ul>
+
+        <h3 style="margin:18px 0 6px">7. The Trade History tab — what the analytics mean</h3>
+        <ul style="margin:0 0 10px 18px;padding:0">
+          <li><b>Win Rate</b> — % of trades closed with a profit (after charges).</li>
+          <li><b>Profit Factor</b> — Total winnings ÷ Total losses. Above 1 = profitable. Above 1.5 is healthy. Above 2 is strong.</li>
+          <li><b>Risk / Reward</b> — Average win ÷ Average loss. Tells you if winning trades pay more than losing trades cost.</li>
+          <li><b>Expectancy / Trade</b> — Average rupees made per trade. Positive = the system is making money on average.</li>
+          <li><b>Max Drawdown</b> — Biggest peak-to-trough fall in equity across the full history. The "worst pain" the system put you through.</li>
+          <li><b>Max Win / Loss Streak</b> — Longest run of consecutive wins or losses. Good for sizing your nerves.</li>
+        </ul>
+
+        <h3 style="margin:18px 0 6px">8. What this bot does NOT do</h3>
+        <ul style="margin:0 0 10px 18px;padding:0">
+          <li>It does <b>not</b> place real orders. Everything is simulated.</li>
+          <li>It does <b>not</b> use price-only indicators (no RSI, no MACD, no candlestick patterns). Decisions are driven by <b>OI structure</b> + simple price-vs-VWAP confirmation.</li>
+          <li>It does <b>not</b> chase moves. If the entry rules don't all line up, it simply waits.</li>
+          <li>It does <b>not</b> hold overnight. Open positions are flat by session end.</li>
+          <li>It does <b>not</b> add to losers, average down, or pyramid winners.</li>
+        </ul>
+
+        <h3 style="margin:18px 0 6px">9. Tunable knobs (Live tab)</h3>
+        <ul style="margin:0 0 10px 18px;padding:0">
+          <li><b>Lots</b> — Position size. 1 lot = 75 NIFTY units. Changing this updates the live session immediately.</li>
+          <li><b>Starting Capital</b> — Used only on the first run. Ignored afterwards.</li>
+          <li><b>Trades / Day</b> — Hard cap. Default 1. Can be changed live without restarting.</li>
+        </ul>
+
+        <h3 style="margin:18px 0 6px">10. Final reminder</h3>
+        <p style="margin:0 0 8px;padding:10px 12px;border:1px solid rgba(245,166,35,.4);background:rgba(245,166,35,.08);border-radius:8px;color:var(--warn);font-size:13px">
+          <b>This is paper-trading and educational software only.</b> The author is <b>not</b> SEBI-registered. Nothing here is investment advice or a recommendation to buy or sell any security. F&amp;O trading carries substantial risk of loss. Use at your own risk.
+        </p>
+      </div>
+      </div>
     </div>
 
     <script>
@@ -201,6 +349,7 @@
         localStorage.removeItem("jwtToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("feedToken");
+        // Drop any stale apiKey from older builds that used to persist it.
         localStorage.removeItem("apiKey");
       }
       function authHeaders() { return { Authorization: "Bearer " + getToken() }; }
@@ -209,6 +358,10 @@
         return false;
       }
       if (!getToken()) { window.location.href = "/index.html"; }
+      // One-shot cleanup: older builds persisted the SmartAPI key in
+      // localStorage. Wipe it on page load so existing sessions don't keep
+      // it lying around in the browser.
+      localStorage.removeItem("apiKey");
 
       const $ = (id) => document.getElementById(id);
       const statusEl = $("status");
@@ -245,11 +398,8 @@
 
       $("startForm").addEventListener("submit", async (e) => {
         e.preventDefault();
-        const apiKey = localStorage.getItem("apiKey") || "";
-        if (!apiKey) { alert("API key missing — please log in again."); window.location.href = "/index.html"; return; }
-
+        // apiKey is held server-side keyed by JWT; the client no longer ships it.
         const payload = {
-          apiKey,
           lots: parseInt($("lots").value, 10),
           maxRupees: parseFloat($("maxRupees").value),
           tradesPerDay: parseInt($("tradesPerDay").value, 10),
@@ -277,6 +427,28 @@
         }
       });
 
+      // Live-tune params (trades/day, lots) on the running session without
+      // requiring a Stop/Start cycle. Debounced so rapid arrow-key changes
+      // collapse into one request.
+      let paramSyncTimer = null;
+      function syncParamsLive() {
+        clearTimeout(paramSyncTimer);
+        paramSyncTimer = setTimeout(async () => {
+          const tpd = parseInt($("tradesPerDay").value, 10);
+          const lots = parseInt($("lots").value, 10);
+          if (!Number.isFinite(tpd) && !Number.isFinite(lots)) return;
+          try {
+            await fetch("/api/oi/params", {
+              method: "POST",
+              headers: { ...authHeaders(), "Content-Type": "application/json" },
+              body: JSON.stringify({ tradesPerDay: tpd, lots }),
+            });
+          } catch {}
+        }, 300);
+      }
+      $("tradesPerDay").addEventListener("input", syncParamsLive);
+      $("lots").addEventListener("input", syncParamsLive);
+
       stopBtn.addEventListener("click", async () => {
         stopBtn.disabled = true;
         stopBtn.textContent = "Stopping…";
@@ -287,25 +459,53 @@
         stopBtn.textContent = "Stop";
       });
 
+      // Format raw OI counts into human-friendly Lakh / Crore (Indian convention).
+      // 1 Lakh = 1e5, 1 Crore = 1e7. Negative values keep their sign and unit.
+      function fmtOI(v) {
+        if (v == null || v === "" || !isFinite(+v)) return "-";
+        const n = +v;
+        const abs = Math.abs(n);
+        if (abs >= 1e7) return (n / 1e7).toFixed(2) + " Cr";
+        if (abs >= 1e5) return (n / 1e5).toFixed(2) + " L";
+        return n.toLocaleString("en-IN");
+      }
+      // Signed flavour for delta columns — same scaling but always carries
+      // the sign so positive/negative direction is unmistakable at a glance.
+      function fmtOISigned(v) {
+        if (v == null || v === "" || !isFinite(+v)) return "-";
+        const n = +v;
+        const s = fmtOI(n);
+        return n > 0 ? "+" + s : s;
+      }
+
       function renderTicks(ticks) {
         if (!ticks || ticks.length === 0) {
           tableWrap.innerHTML = '<p class="empty">Waiting for ticks…</p>';
           return;
         }
         let html = '<table><thead><tr>'
-          + '<th>Time (IST)</th><th>Spot</th><th>CE OI</th><th>PE OI</th>'
-          + '<th>CE Δ</th><th>PE Δ</th><th>Net Flow</th><th>PCR</th>'
-          + '<th>Net</th><th>Strength</th><th>Bias</th><th>Trade</th>'
+          + '<th title="Tick time (Indian Standard Time)">Time</th>'
+          + '<th title="NIFTY spot price at this tick">NIFTY Spot</th>'
+          + '<th title="Total Call Open Interest across tracked strikes (Lakh/Crore)">Total Call OI</th>'
+          + '<th title="Total Put Open Interest across tracked strikes (Lakh/Crore)">Total Put OI</th>'
+          + '<th title="Change in Call OI vs reference window (15-min lookback)">Call OI Change</th>'
+          + '<th title="Change in Put OI vs reference window (15-min lookback)">Put OI Change</th>'
+          + '<th title="Put OI change minus Call OI change. Positive = bullish flow, Negative = bearish flow">Net OI Flow</th>'
+          + '<th title="Put-Call Ratio (Put OI / Call OI). >1 typically bullish, <1 typically bearish">PCR</th>'
+          + '<th title="Normalised flow score — directional signal strength">Signal</th>'
+          + '<th title="Confidence in the signal (0–100%)">Confidence</th>'
+          + '<th title="Market bias derived from OI structure + price action">Market Bias</th>'
+          + '<th title="Trade action taken on this tick (if any)">Trade Action</th>'
           + '</tr></thead><tbody>';
         for (const t of ticks) {
           html += '<tr>'
             + '<td>' + escHtml(t.tsIST || fmtTime(t.ts)) + '</td>'
             + '<td class="num">' + escHtml(t.spot) + '</td>'
-            + '<td class="num">' + escHtml(t.ceTotal) + '</td>'
-            + '<td class="num">' + escHtml(t.peTotal) + '</td>'
-            + '<td class="num">' + escHtml(t.ceDelta ?? "-") + '</td>'
-            + '<td class="num">' + escHtml(t.peDelta ?? "-") + '</td>'
-            + '<td class="num">' + escHtml(t.netFlow ?? "-") + '</td>'
+            + '<td class="num">' + fmtOI(t.ceTotal) + '</td>'
+            + '<td class="num">' + fmtOI(t.peTotal) + '</td>'
+            + '<td class="num">' + fmtOISigned(t.ceDelta) + '</td>'
+            + '<td class="num">' + fmtOISigned(t.peDelta) + '</td>'
+            + '<td class="num">' + fmtOISigned(t.netFlow) + '</td>'
             + '<td class="num">' + escHtml(t.pcrOI ?? "-") + '</td>'
             + '<td class="num">' + escHtml(t.net ?? "-") + '</td>'
             + '<td class="num">' + escHtml(t.strength != null ? t.strength + "%" : "-") + '</td>'
@@ -430,6 +630,69 @@
         return '<span class="badge ' + cls + '">' + inr(v) + '</span>';
       };
 
+      function computeAnalytics(days) {
+        const allTrades = [];
+        for (const d of days) if (d.trades) for (const tr of d.trades) allTrades.push(tr);
+        const pnls = allTrades.map(t => Number(t.netPnl ?? t.pnl ?? 0));
+        const wins = pnls.filter(p => p > 0);
+        const losses = pnls.filter(p => p <= 0);
+        const sum = (a) => a.reduce((x, y) => x + y, 0);
+        const grossWin = sum(wins);
+        const grossLoss = Math.abs(sum(losses));
+        const winRate = pnls.length ? (wins.length / pnls.length) * 100 : 0;
+        const lossRate = pnls.length ? (losses.length / pnls.length) * 100 : 0;
+        const avgWin = wins.length ? grossWin / wins.length : 0;
+        const avgLoss = losses.length ? grossLoss / losses.length : 0;
+        const profitFactor = grossLoss > 0 ? grossWin / grossLoss : (grossWin > 0 ? Infinity : 0);
+        const expectancy = pnls.length ? sum(pnls) / pnls.length : 0;
+        const bestTrade = pnls.length ? Math.max(...pnls) : 0;
+        const worstTrade = pnls.length ? Math.min(...pnls) : 0;
+        const rrRatio = avgLoss > 0 ? avgWin / avgLoss : (avgWin > 0 ? Infinity : 0);
+
+        // Streaks (chronological by entryTs)
+        const ordered = [...allTrades].sort((a, b) =>
+          new Date(a.entryTs || 0) - new Date(b.entryTs || 0));
+        let curW = 0, curL = 0, maxW = 0, maxL = 0;
+        for (const t of ordered) {
+          const p = Number(t.netPnl ?? t.pnl ?? 0);
+          if (p > 0) { curW++; curL = 0; if (curW > maxW) maxW = curW; }
+          else      { curL++; curW = 0; if (curL > maxL) maxL = curL; }
+        }
+
+        // Day-level stats
+        const dayPnls = days.map(d => Number(d.netPnl || 0));
+        const profitDays = dayPnls.filter(p => p > 0).length;
+        const lossDays = dayPnls.filter(p => p < 0).length;
+        const bestDay = dayPnls.length ? Math.max(...dayPnls) : 0;
+        const worstDay = dayPnls.length ? Math.min(...dayPnls) : 0;
+
+        // Equity curve & max drawdown (on net P&L, chronological)
+        let equity = 0, peak = 0, maxDD = 0;
+        for (const t of ordered) {
+          equity += Number(t.netPnl ?? t.pnl ?? 0);
+          if (equity > peak) peak = equity;
+          const dd = peak - equity;
+          if (dd > maxDD) maxDD = dd;
+        }
+
+        return {
+          total: pnls.length, wins: wins.length, losses: losses.length,
+          winRate, lossRate, avgWin, avgLoss, profitFactor, expectancy,
+          bestTrade, worstTrade, rrRatio, maxWinStreak: maxW, maxLossStreak: maxL,
+          tradingDays: days.length, profitDays, lossDays, bestDay, worstDay, maxDD,
+          grossWin, grossLoss,
+        };
+      }
+
+      const pct = (v) => (v == null || !isFinite(v) ? "-" : v.toFixed(2) + "%");
+      const num = (v) => (v == null || !isFinite(v) ? "-" : (Math.round(v * 100) / 100).toString());
+      const pfFmt = (v) => (!isFinite(v) ? "∞" : (Math.round(v * 100) / 100).toString());
+      const colored = (v, fmt) => {
+        if (v == null) return "-";
+        const cls = v >= 0 ? "b-bull" : "b-bear";
+        return '<span class="badge ' + cls + '">' + fmt(v) + '</span>';
+      };
+
       function renderHistory(h) {
         if (!h || !h.days || h.days.length === 0) {
           histTotals.innerHTML = "";
@@ -437,14 +700,53 @@
           return;
         }
         const t = h.totals || {};
+        const a = computeAnalytics(h.days);
+
+        const card = (title, body) =>
+          '<div style="background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px">' +
+            '<div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">' + title + '</div>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">' + body + '</div>' +
+          '</div>';
+
+        const overview = card("Overview",
+          stat("Total Trades", a.total) +
+          stat("Wins / Losses", a.wins + " / " + a.losses) +
+          stat("Win Rate", '<span class="badge b-bull">' + pct(a.winRate) + '</span>') +
+          stat("Loss Rate", '<span class="badge b-bear">' + pct(a.lossRate) + '</span>') +
+          stat("Trading Days", a.tradingDays) +
+          stat("Profit / Loss Days", a.profitDays + " / " + a.lossDays)
+        );
+
+        const pnlCard = card("P&L Summary",
+          stat("Capital Deployed", inr(t.capital)) +
+          stat("Gross P&L", pnlSpan(t.grossPnl)) +
+          stat("Total Charges", inr(t.totalCharges)) +
+          stat("Net P&L", pnlSpan(t.netPnl)) +
+          stat("Gross Wins", '<span class="badge b-bull">' + inr(a.grossWin) + '</span>') +
+          stat("Gross Losses", '<span class="badge b-bear">' + inr(a.grossLoss) + '</span>')
+        );
+
+        const ratios = card("Ratios & Performance",
+          stat("Profit Factor", pfFmt(a.profitFactor)) +
+          stat("Risk / Reward", pfFmt(a.rrRatio)) +
+          stat("Expectancy / Trade", pnlSpan(Math.round(a.expectancy * 100) / 100)) +
+          stat("Avg Win", '<span class="badge b-bull">' + inr(a.avgWin) + '</span>') +
+          stat("Avg Loss", '<span class="badge b-bear">' + inr(a.avgLoss) + '</span>') +
+          stat("Max Drawdown", '<span class="badge b-bear">' + inr(a.maxDD) + '</span>')
+        );
+
+        const extremes = card("Extremes & Streaks",
+          stat("Best Trade", colored(a.bestTrade, inr)) +
+          stat("Worst Trade", colored(a.worstTrade, inr)) +
+          stat("Best Day", colored(a.bestDay, inr)) +
+          stat("Worst Day", colored(a.worstDay, inr)) +
+          stat("Max Win Streak", a.maxWinStreak) +
+          stat("Max Loss Streak", a.maxLossStreak)
+        );
+
         histTotals.innerHTML =
-          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px">' +
-            stat("Trades", t.count) +
-            stat("Wins / Losses", (t.wins || 0) + " / " + (t.losses || 0)) +
-            stat("Capital deployed", inr(t.capital)) +
-            stat("Gross P&L", pnlSpan(t.grossPnl)) +
-            stat("Total charges", inr(t.totalCharges)) +
-            stat("Net P&L", pnlSpan(t.netPnl)) +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">' +
+            overview + pnlCard + ratios + extremes +
           '</div>';
 
         let html = '<table><thead><tr>'
@@ -530,9 +832,10 @@
       // Also refresh history every 30s so newly-closed trades show up.
       setInterval(loadHistory, 30000);
 
-      // ---------- Sub-tab switching (Live / Trade History) ----------
+      // ---------- Sub-tab switching (Live / Trade History / Strategy) ----------
       const liveView = $("liveView");
       const historyView = $("historyView");
+      const strategyView = $("strategyView");
       document.querySelectorAll("#subTabs .tab").forEach(btn => {
         btn.addEventListener("click", () => {
           document.querySelectorAll("#subTabs .tab").forEach(b => b.classList.remove("active"));
@@ -540,6 +843,7 @@
           const view = btn.getAttribute("data-view");
           liveView.style.display = view === "live" ? "" : "none";
           historyView.style.display = view === "history" ? "" : "none";
+          strategyView.style.display = view === "strategy" ? "" : "none";
           if (view === "history") loadHistory();
         });
       });

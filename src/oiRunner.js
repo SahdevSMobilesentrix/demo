@@ -79,7 +79,11 @@ function findNearestWeeklyExpiry(instruments) {
 }
 
 function pickStrikes(instruments, expiryStr, atm) {
-  const wanted = [-2, -1, 0, 1, 2].map((k) => atm + k * STRIKE_STEP);
+  // Tracking ATM ± 3 = 7 strikes (14 contracts: CE+PE each).
+  // The extra wing strike on each side helps capture flow when spot drifts
+  // before the bot re-anchors, and gives a cleaner picture of where
+  // institutional writers are stacking OI.
+  const wanted = [-3, -2, -1, 0, 1, 2, 3].map((k) => atm + k * STRIKE_STEP);
   const out = [];
   for (const strike of wanted) {
     for (const side of ["CE", "PE"]) {
@@ -109,7 +113,7 @@ function findNiftyIndex(instruments) {
   return candidates[0]?.inst || null;
 }
 
-function computeBias(history, latest, priceBull, priceBear) {
+function computeBias(history, latest) {
   const cutoff = latest.ts - LOOKBACK_MIN * 60 * 1000;
   let ref = null;
   for (const h of history) { if (h.ts <= cutoff) ref = h; else break; }
@@ -132,14 +136,17 @@ function computeBias(history, latest, priceBull, priceBear) {
   const net = peN - ceN;
 
   let bias = "Neutral";
-  // Lowered netFlow gate so the classifier actually fires during typical
-  // intraday OI swings — the previous 50k floor was almost never hit on
-  // ATM±2 NIFTY weeklies, leaving bias stuck at Neutral and no entries.
+  // The displayed bias is a function of the OI signal ONLY — it must not
+  // depend on a process-local VWAP buffer, otherwise two servers polling
+  // the same Angel One API will display different labels because their
+  // VWAP histories differ. Price-action confirmation is still required at
+  // entry time (see maybeEnter() in this file), so trade quality is
+  // preserved while the label stays consistent across deployments.
   if (Math.abs(netFlow) > 10000) {
-    if (net > 1.5 && priceBull)       bias = "Strong Bullish";
-    else if (net > 0.5 && priceBull)  bias = "Bullish";
-    else if (net < -1.5 && priceBear) bias = "Strong Bearish";
-    else if (net < -0.5 && priceBear) bias = "Bearish";
+    if (net > 1.5)        bias = "Strong Bullish";
+    else if (net > 0.5)   bias = "Bullish";
+    else if (net < -1.5)  bias = "Strong Bearish";
+    else if (net < -0.5)  bias = "Bearish";
   }
 
   return {
@@ -210,11 +217,74 @@ function maybeEnter(bias, latest, atm) {
 
   const { lots } = state.params;
   let side = null;
-  if (bias === "Strong Bullish" || bias === "Bullish") side = "LONG_CE";
-  else if (bias === "Strong Bearish" || bias === "Bearish") side = "LONG_PE";
+  // Only accept STRONG bias for entries. Mild "Bullish/Bearish" is too noisy
+  // and routinely flips back to Neutral within a candle or two.
+  if (bias === "Strong Bullish") side = "LONG_CE";
+  else if (bias === "Strong Bearish") side = "LONG_PE";
   if (!side) return;
 
-  const key = side === "LONG_CE" ? `${atm}CE` : `${atm}PE`;
+  // ---- Multi-candle confirmation gate ----
+  // state.ticks is newest-first. Require the last CONFIRM_TICKS ticks to all
+  // agree on a STRONG bias in the same direction, with price action aligning.
+  // This blocks single-tick spikes / fakeouts (the exact failure mode that
+  // produced the premature LONG_CE@24200 entry).
+  const CONFIRM_TICKS = 3;
+  const recent = state.ticks.slice(0, CONFIRM_TICKS);
+  if (recent.length < CONFIRM_TICKS) {
+    pushLog(`skip ${side} — need ${CONFIRM_TICKS} confirming ticks, have ${recent.length}`);
+    return;
+  }
+  const wantBias = side === "LONG_CE" ? "Strong Bullish" : "Strong Bearish";
+  const allAgree = recent.every(t => t.bias === wantBias);
+  if (!allAgree) {
+    pushLog(`skip ${side} — bias not sustained for ${CONFIRM_TICKS} ticks (${recent.map(t=>t.bias).join(" | ")})`);
+    return;
+  }
+  const priceAligned = side === "LONG_CE"
+    ? recent.every(t => t.priceBull)
+    : recent.every(t => t.priceBear);
+  if (!priceAligned) {
+    pushLog(`skip ${side} — price action not aligned across ${CONFIRM_TICKS} ticks`);
+    return;
+  }
+
+  // ---- Breakout gate ----
+  // Don't buy a CE while spot is still below the ATM strike (buying into
+  // resistance), or a PE while spot is above ATM (buying into support).
+  // Require spot to have CLEARED the strike on the latest tick AND on the
+  // prior confirming tick — i.e. the breakout has held for >1 candle.
+  const spotNow = latest.spot;
+  const spotPrev = recent[1]?.spot ?? spotNow;
+  const cleared = side === "LONG_CE"
+    ? (spotNow > atm && spotPrev > atm)
+    : (spotNow < atm && spotPrev < atm);
+  if (!cleared) {
+    pushLog(`skip ${side} — no sustained breakout of ${atm} (spot ${round(spotPrev)} → ${round(spotNow)})`);
+    return;
+  }
+
+  // ---- Momentum sustain gate ----
+  // Latest spot must be making progress in the trade direction vs the
+  // confirming window — guards against entering on a stalling move.
+  const spotOldest = recent[recent.length - 1]?.spot ?? spotNow;
+  const movingWithUs = side === "LONG_CE"
+    ? spotNow > spotOldest
+    : spotNow < spotOldest;
+  if (!movingWithUs) {
+    pushLog(`skip ${side} — momentum stalling (spot ${round(spotOldest)} → ${round(spotNow)})`);
+    return;
+  }
+
+  // ---- Strike selection: 1-step ITM (near-the-money, not deep) ----
+  // Buying ITM gives higher delta (~0.6 vs 0.5 for ATM), less theta as a %
+  // of premium, and intrinsic value cushions small adverse moves. We stay
+  // just one strike in (50 pts on NIFTY) so premium isn't huge — deep ITM
+  // would cost too much capital and lose liquidity.
+  //
+  // For LONG_CE (bullish): buy strike BELOW spot → strike = atm - 50
+  // For LONG_PE (bearish): buy strike ABOVE spot → strike = atm + 50
+  const tradeStrike = side === "LONG_CE" ? atm - STRIKE_STEP : atm + STRIKE_STEP;
+  const key = side === "LONG_CE" ? `${tradeStrike}CE` : `${tradeStrike}PE`;
   const px = latest.premiumByStrike[key];
   if (!px) {
     pushLog(`skip ${side} — no premium for ${key}`);
@@ -225,17 +295,17 @@ function maybeEnter(bias, latest, atm) {
   // Running balance is the source of truth — not a per-day allowance.
   const bal = riskGuard ? riskGuard.capital : 0;
   if (cost > bal) {
-    pushLog(`skip ${side} @ ${px} — cost ₹${round(cost)} > balance ₹${round(bal)}`);
-    state.halt = { day: today, reason: "insufficient_capital", message: `Insufficient balance: ₹${round(bal)} available, trade needs ₹${round(cost)}.` };
+    pushLog(`skip ${side} @ ${px} — cost ₹${round(cost)} > balance ₹${round(bal)} (ITM strike ${tradeStrike})`);
+    state.halt = { day: today, reason: "insufficient_capital", message: `Insufficient balance: ₹${round(bal)} available, trade needs ₹${round(cost)} for ITM strike ${tradeStrike}.` };
     return;
   }
   state.openTrade = {
-    entryTs: latest.ts, side, strike: atm,
-    symbol: side === "LONG_CE" ? "NIFTY-ATM-CE" : "NIFTY-ATM-PE",
+    entryTs: latest.ts, side, strike: tradeStrike,
+    symbol: side === "LONG_CE" ? "NIFTY-ITM-CE" : "NIFTY-ITM-PE",
     entryPx: px, cost,
   };
   stateStore.save({ openTrade: state.openTrade, risk: riskGuard?.snapshot() });
-  pushLog(`PAPER BUY ${state.openTrade.symbol} strike=${atm} @ ₹${px} cost=₹${round(cost)} [bal=₹${round(bal)}]`);
+  pushLog(`PAPER BUY ${state.openTrade.symbol} strike=${tradeStrike} (ATM=${atm}) @ ₹${px} cost=₹${round(cost)} [bal=₹${round(bal)}]`);
 }
 
 function maybeExit(bias, latest, reason = null) {
@@ -253,7 +323,24 @@ function maybeExit(bias, latest, reason = null) {
   // not a phantom per-day allowance.
   const stop = pnl < -ot.cost * STOP_FRAC;
   const target = pnl > ot.cost * TARGET_FRAC;
-  const why = reason || (flipped ? "BIAS_FLIP" : stop ? "STOP" : target ? "TARGET" : null);
+  // Bias-decay exit: if the supporting STRONG bias has degraded to Neutral
+  // (or flat "Bullish/Bearish") for 2 ticks in a row AFTER entry, cut the
+  // trade rather than waiting for SL. Mirrors the "exit when momentum
+  // weakens / market becomes neutral" rule.
+  const wantBias = ot.side === "LONG_CE" ? "Strong Bullish" : "Strong Bearish";
+  const recent = (state.ticks || []).slice(0, 2);
+  const decayed =
+    recent.length === 2 &&
+    recent.every(t => t.ts > ot.entryTs && t.bias !== wantBias && !(
+      (ot.side === "LONG_CE" && t.bias === "Bullish") ||
+      (ot.side === "LONG_PE" && t.bias === "Bearish")
+    ));
+  const why = reason
+    || (flipped ? "BIAS_FLIP"
+    : stop ? "STOP"
+    : target ? "TARGET"
+    : decayed ? "BIAS_DECAY"
+    : null);
   if (!why) return;
   const dayKey = istDateKey();
   const closed = { ...ot, exitTs: latest.ts, exitPx: px, pnl: round(pnl), reason: why, dayKey };
@@ -324,9 +411,31 @@ export function stopOiTest() {
   return { ok: true };
 }
 
+// Live-tune params on the running session without Stop/Start. Currently
+// supports tradesPerDay and lots — both are read fresh on every tick, so
+// the change takes effect immediately on the next entry decision.
+export function updateOiParams({ tradesPerDay, lots } = {}) {
+  if (!state) return { ok: false, error: "no active session" };
+  const updated = {};
+  if (tradesPerDay != null) {
+    const v = Math.max(1, +tradesPerDay);
+    if (Number.isFinite(v)) { state.params.tradesPerDay = v; updated.tradesPerDay = v; }
+  }
+  if (lots != null) {
+    const v = Math.max(1, +lots);
+    if (Number.isFinite(v)) { state.params.lots = v; updated.lots = v; }
+  }
+  if (Object.keys(updated).length) {
+    pushLog(`params updated: ${Object.entries(updated).map(([k,v])=>`${k}=${v}`).join(" ")}`);
+    // Clear any cap-based halt banner — the new cap may now allow more entries today.
+    if (state.halt?.reason === "cap") { state.halt = null; state.lastBlockedDay = null; }
+  }
+  return { ok: true, params: state.params };
+}
+
 // Default cap = 375 min (full NSE trading day). Frontend doesn't pass minutes;
 // runs until Stop is clicked or this hard cap is hit.
-export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, maxRupees = 15000, tradesPerDay = 2 }) {
+export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, maxRupees = 15000, tradesPerDay = 1 }) {
   if (state && (state.status === "running" || state.status === "starting")) {
     throw new Error("OI test already running. Stop it first.");
   }
@@ -369,7 +478,7 @@ export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, m
       state.expiry = expiry.str;
 
       const optTokens = pickStrikes(instruments, expiry.str, atm);
-      if (optTokens.length === 0) throw new Error("No option tokens resolved for ATM±2");
+      if (optTokens.length === 0) throw new Error("No option tokens resolved for ATM±3");
       pushLog(`spot=${spot} ATM=${atm} expiry=${expiry.str} options=${optTokens.length}`);
 
       // Resume snapshot history & tick log from disk — bypasses warmup if
@@ -385,7 +494,14 @@ export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, m
         // Newest-first; cap to UI limit.
         state.ticks = persistedTicks.slice(0, 1000);
       }
-      const vwapBuf = [];
+      // VWAP buffer is anchored to the current IST trading day. If a tick
+      // crosses into a new IST day, the buffer resets so VWAP doesn't drift
+      // across days. Without this, a process that starts mid-day computes a
+      // very different VWAP from one that's been running since 09:15, which
+      // makes the bias label diverge across deployments even when the OI
+      // signal is identical.
+      let vwapBuf = [];
+      let vwapDay = istDateKey();
       state.status = "running";
 
       while (Date.now() < state.endsAt && state.status === "running") {
@@ -396,6 +512,9 @@ export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, m
           ];
           const q = await fetchQuotes(jwtToken, apiKey, tokens);
           const curSpot = q.NIFTY50?.ltp ?? spot;
+          // Day rollover: clear the VWAP buffer at the IST date boundary.
+          const curDay = istDateKey();
+          if (curDay !== vwapDay) { vwapBuf = []; vwapDay = curDay; }
           vwapBuf.push(curSpot);
           const vwap = vwapBuf.reduce((a,b)=>a+b,0) / vwapBuf.length;
           const priceBull = curSpot > vwap;
@@ -418,7 +537,7 @@ export async function startOiTest({ jwtToken, apiKey, minutes = 375, lots = 1, m
           // Trim in-memory + persist so the warmup window survives restarts.
           if (history.length > 240) history.splice(0, history.length - 240);
           historyStore.save(history);
-          const r = computeBias(history, latest, priceBull, priceBear);
+          const r = computeBias(history, latest);
 
           // Newest-first into state.ticks
           state.ticks.unshift({

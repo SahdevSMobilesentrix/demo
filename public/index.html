@@ -79,14 +79,23 @@
         body { font-size: 14px; }
         .wrap { padding: 28px 14px; }
         h1 { font-size: 22px; }
-        .card { padding: 16px; }
+        .card { padding: 16px; overflow-wrap: break-word; }
         .modal { padding: 18px; border-radius: 12px; }
         .modal h2 { font-size: 18px; }
         input { font-size: 16px; padding: 12px 13px; }   /* prevents iOS focus zoom */
         input.totp { font-size: 20px; letter-spacing: 6px; }
         button { padding: 12px 14px; }
-        .actions { flex-wrap: wrap; }
+        .actions { flex-wrap: wrap; gap: 8px; }
         .actions button { flex: 1 1 140px; }
+        pre { font-size: 11px; max-height: 200px; }
+      }
+      @media (max-width: 420px) {
+        .wrap { padding: 20px 10px; }
+        h1 { font-size: 18px; }
+        .card { padding: 14px; }
+        .modal { padding: 14px; }
+        input.totp { font-size: 18px; letter-spacing: 4px; }
+        .actions button { flex: 1 1 100%; }
       }
 
       .status {
@@ -232,7 +241,9 @@
             localStorage.setItem("jwtToken", j.jwtToken);
             localStorage.setItem("refreshToken", j.refreshToken);
             localStorage.setItem("feedToken", j.feedToken);
-            localStorage.setItem("apiKey", payload.apiKey);
+            // apiKey is intentionally NOT persisted client-side. The server
+            // caches it server-side keyed by jwtToken at login.
+            localStorage.removeItem("apiKey");
             window.location.href = "/oi.html";
             return;
           } else {
