@@ -48,8 +48,10 @@ function findNearestWeeklyExpiry(instruments) {
 }
 
 function pickStrikes(instruments, expiryStr, atm) {
-  // 10 strikes: 5 below ATM, ATM, 4 above ATM.
-  const wanted = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4].map((k) => atm + k * STRIKE_STEP);
+  // 21 strikes: 10 below ATM, ATM, 10 above ATM.
+  const offsets = [];
+  for (let k = -10; k <= 10; k++) offsets.push(k);
+  const wanted = offsets.map((k) => atm + k * STRIKE_STEP);
   const out = [];
   for (const strike of wanted) {
     for (const side of ["CE", "PE"]) {

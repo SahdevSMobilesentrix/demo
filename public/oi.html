@@ -88,12 +88,12 @@
       .dot.itm-call{background:color-mix(in srgb,var(--ok) 35%,var(--panel));border:1px solid color-mix(in srgb,var(--ok) 55%,var(--panel))}
       .dot.itm-put{background:color-mix(in srgb,var(--danger) 35%,var(--panel));border:1px solid color-mix(in srgb,var(--danger) 55%,var(--panel))}
       /* Side-by-side layout: OI table on the left, glossary grid on the right */
-      .chain-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;align-items:start}
+      .chain-layout{display:flex;flex-direction:column;gap:14px}
       .glossary{border:1px solid var(--border);border-radius:12px;background:var(--panel);overflow:hidden}
       .glossary table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
       .glossary th,.glossary td{padding:9px 11px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;line-height:1.45}
       .glossary thead th{background:var(--panel-2);color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
-      .glossary tbody th{width:38%;font-weight:700;color:var(--text);background:var(--panel-2);border-right:1px solid var(--border);white-space:nowrap}
+      .glossary tbody th{width:220px;font-weight:700;color:var(--text);background:var(--panel-2);border-right:1px solid var(--border);white-space:nowrap}
       .glossary tbody td{color:var(--muted)}
       .glossary tr:last-child th,.glossary tr:last-child td{border-bottom:0}
       .glossary .up{color:var(--ok);font-weight:700}
@@ -536,7 +536,7 @@
               No clear pressure → <span class="pill neut">Neutral</span>.
             </p>
             <div class="strategy-grid">
-              <div class="item"><b>Universe</b><span>NIFTY weekly · 10 strikes (5 below ATM + ATM + 4 above)</span></div>
+              <div class="item"><b>Universe</b><span>NIFTY weekly · 21 strikes (10 below ATM + ATM + 10 above)</span></div>
               <div class="item"><b>Cadence</b><span>1-minute OI snapshots · ΔOI vs ~15 min ago</span></div>
               <div class="item"><b>Signal window</b><span>09:45 – 14:00 IST (avoids open/close noise)</span></div>
               <div class="item"><b>Risk gate</b><span>Skipped if India VIX moves &gt; 4% intraday</span></div>
@@ -546,7 +546,7 @@
           <div class="card">
             <h3>How it Works</h3>
             <ol>
-              <li><b>Collect</b> Call &amp; Put OI for the 10 nearest strikes once per minute.</li>
+              <li><b>Collect</b> Call &amp; Put OI for the 21 nearest strikes once per minute.</li>
               <li><b>Compute ΔOI</b> for each strike vs the snapshot ~15 minutes earlier.</li>
               <li><b>Score each candidate strike</b> on 4 checks (need 3 of 4 to qualify):
                 <ul>
@@ -694,6 +694,17 @@
         const s = fmtOI(n);
         return n > 0 ? "+" + s : s;
       }
+      // Label the ΔOI movement: positive = fresh writing, negative = unwinding / short covering.
+      // side: "call" or "put".
+      function deltaTag(v, side) {
+        if (v == null || v === "" || !isFinite(+v)) return "";
+        const n = +v;
+        if (n === 0) return "";
+        if (n > 0) return '<span class="dim"> (fresh writing)</span>';
+        return side === "call"
+          ? '<span class="dim"> (short covering)</span>'
+          : '<span class="dim"> (unwinding)</span>';
+      }
 
       function signedCls(v) {
         if (v == null || !isFinite(+v)) return "num";
@@ -823,11 +834,11 @@
           }
           html += '<tr' + (r.atm ? ' class="atm"' : '') + '>'
             + '<td class="' + callSide + '">' + fmtOI(r.ceOI) + '</td>'
-            + '<td class="' + callSide + ' ' + ceDcls + '">' + fmtOISigned(r.ceDelta) + '</td>'
+            + '<td class="' + callSide + ' ' + ceDcls + '">' + fmtOISigned(r.ceDelta) + deltaTag(r.ceDelta, "call") + '</td>'
             + '<td class="' + callSide + '">' + (r.ceLtp == null ? '<span class="dim">–</span>' : (+r.ceLtp).toFixed(2)) + '</td>'
             + '<td class="strike-col">' + r.strike + '</td>'
             + '<td class="' + putSide + '">' + (r.peLtp == null ? '<span class="dim">–</span>' : (+r.peLtp).toFixed(2)) + '</td>'
-            + '<td class="' + putSide + ' ' + peDcls + '">' + fmtOISigned(r.peDelta) + '</td>'
+            + '<td class="' + putSide + ' ' + peDcls + '">' + fmtOISigned(r.peDelta) + deltaTag(r.peDelta, "put") + '</td>'
             + '<td class="' + putSide + '">' + fmtOI(r.peOI) + '</td>'
             + '</tr>';
         }
