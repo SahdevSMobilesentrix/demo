@@ -11,6 +11,7 @@
 
 import "dotenv/config";
 import express from "express";
+import nodeFs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pino from "pino";
@@ -20,9 +21,21 @@ import {
   startOiTest,
   stopOiTest,
   getOiState,
-  updateOiParams,
 } from "./oiRunner.js";
-import { getDayWiseHistory } from "./oiHistory.js";
+import {
+  runOnce as runSignalOnce,
+  startAutoRun as startSignalAuto,
+  stopAutoRun as stopSignalAuto,
+  getSignalState,
+} from "./signalRunner.js";
+import {
+  getPaperState,
+  updateSettings as updatePaperSettings,
+  resetCapital as resetPaperCapital,
+  exportCsv as exportPaperCsv,
+  manualExit as paperManualExit,
+} from "./paper/paperTrader.js";
+import { marketSnapshot } from "./marketClock.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const log = pino({ level: process.env.LOG_LEVEL || "info" });
@@ -81,6 +94,16 @@ app.post("/api/angel/login", async (req, res) => {
     const out = await loginAngelOne({ apiKey, clientCode, pin, totp });
     rememberApiKey(out.jwtToken, apiKey);
     log.info({ clientCode }, "angel login ok");
+
+    // Auto-start OI tracker — no manual Start/Stop needed.
+    // The runner self-gates on market hours / weekends / holidays.
+    startOiTest({ jwtToken: out.jwtToken, apiKey })
+      .then(r => log.info({ status: r.status }, "oi tracker auto-started"))
+      .catch(e => log.warn({ err: e.message }, "oi tracker auto-start failed"));
+
+    // Auto-start signal engine auto-run too (already gated on market clock).
+    try { startSignalAuto({ symbol: "NIFTY" }); } catch {}
+
     res.json({ ok: true, ...out });
   } catch (err) {
     log.warn({ err: err.message }, "angel login failed");
@@ -100,15 +123,7 @@ app.post("/api/oi/start", requireAuth, async (req, res) => {
       .json({ ok: false, error: "apiKey not found for this session — please log in again" });
   }
   try {
-    const { lots, maxRupees, tradesPerDay, minutes } = req.body || {};
-    const out = await startOiTest({
-      jwtToken: req.jwtToken,
-      apiKey,
-      lots,
-      maxRupees,
-      tradesPerDay,
-      ...(minutes != null ? { minutes } : {}),
-    });
+    const out = await startOiTest({ jwtToken: req.jwtToken, apiKey });
     res.json(out);
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });
@@ -123,16 +138,74 @@ app.get("/api/oi/state", requireAuth, (_req, res) => {
   res.json(getOiState());
 });
 
-app.post("/api/oi/params", requireAuth, (req, res) => {
-  res.json(updateOiParams(req.body || {}));
+// List how many days of OI snapshots are preserved on disk (no auth needed).
+app.get("/api/oi/history-days", (_req, res) => {
+  try {
+    const root = process.env.FNO_DATA_ROOT
+      || path.join(process.cwd(), "data", "fno");
+    const dir = path.join(root, "snapshots", "NIFTY");
+    if (!nodeFs.existsSync(dir)) return res.json({ days: [], count: 0 });
+    const files = nodeFs.readdirSync(dir).filter(f => /^\d{8}\.jsonl$/.test(f));
+    const days = files.map(f => f.slice(0, 8)).sort().reverse();
+    res.json({ days, count: days.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-app.get("/api/oi/history", requireAuth, (_req, res) => {
+// ---- Smart Money Signal endpoints (Python engine bridge) ----
+
+app.get("/api/signal/state", requireAuth, (_req, res) => {
+  res.json(getSignalState());
+});
+
+app.post("/api/signal/run-now", requireAuth, async (req, res) => {
+  const symbol = (req.body?.symbol || "NIFTY").toUpperCase();
+  const skipDay = !!req.body?.skipDay;
+  const out = await runSignalOnce({ symbol, skipDay });
+  res.json(out);
+});
+
+app.post("/api/signal/start", requireAuth, (req, res) => {
+  const symbol = (req.body?.symbol || "NIFTY").toUpperCase();
+  res.json(startSignalAuto({ symbol }));
+});
+
+app.post("/api/signal/stop", requireAuth, (_req, res) => {
+  res.json(stopSignalAuto());
+});
+
+// ---- Paper Trading endpoints ----
+
+app.get("/api/market/status", (_req, res) => {
+  res.json(marketSnapshot());
+});
+
+app.get("/api/paper/state", requireAuth, (_req, res) => {
+  res.json(getPaperState());
+});
+
+app.post("/api/paper/settings", requireAuth, (req, res) => {
   try {
-    res.json({ ok: true, days: getDayWiseHistory() });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
+    const out = updatePaperSettings(req.body || {});
+    res.json({ ok: true, settings: out });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.message });
   }
+});
+
+app.post("/api/paper/exit-now", requireAuth, (_req, res) => {
+  res.json(paperManualExit());
+});
+
+app.post("/api/paper/reset", requireAuth, (_req, res) => {
+  res.json(resetPaperCapital());
+});
+
+app.get("/api/paper/export.csv", requireAuth, (_req, res) => {
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", 'attachment; filename="paper_trades.csv"');
+  res.send(exportPaperCsv());
 });
 
 const port = process.env.PORT || 3000;

@@ -5,123 +5,230 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Angel One — Login</title>
     <style>
-      :root {
-        color-scheme: light dark;
-        --bg: #0f1115;
-        --panel: #181b22;
-        --panel-2: #20242d;
-        --border: #2a2f3a;
-        --text: #e6e8ee;
-        --muted: #8b93a7;
-        --accent: #4f8cff;
-        --ok: #21c07a;
-        --danger: #ff5d6c;
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --bg: #f4f6fb;
+        --bg-grad: radial-gradient(1200px 600px at 10% -10%, #e7efff 0%, transparent 60%),
+                   radial-gradient(900px 500px at 110% 10%, #f0e9ff 0%, transparent 55%);
+        --panel: #ffffff;
+        --panel-2: #f5f7fc;
+        --border: #e3e7f0;
+        --border-strong: #cfd5e3;
+        --text: #0f172a;
+        --muted: #5b6477;
+        --accent: #3b6cff;
+        --accent-2: #6e8bff;
+        --accent-soft: rgba(59,108,255,.12);
+        --ok: #16a368;
+        --danger: #e34b5b;
+        --shadow: 0 10px 30px rgba(20,30,60,.08), 0 2px 6px rgba(20,30,60,.04);
+        --shadow-lg: 0 25px 60px rgba(20,30,60,.18);
       }
-      @media (prefers-color-scheme: light) {
-        :root {
-          --bg: #f6f7fb; --panel: #fff; --panel-2: #f1f3f8;
-          --border: #d9dde7; --text: #1a1d24; --muted: #5c6478;
-        }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0b0e15;
+        --bg-grad: radial-gradient(1200px 600px at 10% -10%, rgba(59,108,255,.18) 0%, transparent 60%),
+                   radial-gradient(900px 500px at 110% 10%, rgba(140,90,255,.14) 0%, transparent 55%);
+        --panel: #141823;
+        --panel-2: #1b202c;
+        --border: #262c3a;
+        --border-strong: #323a4d;
+        --text: #e8ecf5;
+        --muted: #8b93a7;
+        --accent: #5b85ff;
+        --accent-2: #8aa3ff;
+        --accent-soft: rgba(91,133,255,.18);
+        --ok: #2bd28a;
+        --danger: #ff6376;
+        --shadow: 0 10px 30px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.3);
+        --shadow-lg: 0 25px 60px rgba(0,0,0,.6);
       }
       * { box-sizing: border-box; }
+      html, body { height: 100%; }
       body {
         margin: 0; min-height: 100vh;
-        font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-        background: var(--bg); color: var(--text);
+        font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Inter", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+        background-image: var(--bg-grad);
+        background-attachment: fixed;
+        -webkit-font-smoothing: antialiased;
+        transition: background-color .25s ease, color .25s ease;
       }
-      .wrap { max-width: 560px; margin: 0 auto; padding: 60px 20px; }
-      h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -.01em; }
-      header p { margin: 0; color: var(--muted); }
+      .wrap { max-width: 560px; margin: 0 auto; padding: 48px 20px; }
+
+      .topbar {
+        display: flex; justify-content: space-between; align-items: center;
+        gap: 12px;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; }
+      .logo {
+        width: 36px; height: 36px; border-radius: 10px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        display: grid; place-items: center; color: #fff; font-weight: 800;
+        box-shadow: 0 6px 16px var(--accent-soft);
+      }
+      .brand-name { font-weight: 700; letter-spacing: -.01em; }
+      .theme-toggle {
+        width: 38px; height: 38px; border-radius: 10px;
+        border: 1px solid var(--border); background: var(--panel);
+        display: grid; place-items: center; cursor: pointer; color: var(--text);
+        transition: transform .15s ease, border-color .15s ease;
+      }
+      .theme-toggle:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+      .theme-toggle svg { width: 18px; height: 18px; }
+      :root[data-theme="dark"] .icon-sun { display: block; }
+      :root[data-theme="dark"] .icon-moon { display: none; }
+      :root[data-theme="light"] .icon-sun { display: none; }
+      :root[data-theme="light"] .icon-moon { display: block; }
+
+      header { margin-top: 32px; }
+      h1 {
+        font-size: 28px; margin: 0 0 6px; letter-spacing: -.02em;
+        background: linear-gradient(90deg, var(--text), var(--accent));
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      header p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
       .card {
         background: var(--panel); border: 1px solid var(--border);
-        border-radius: 14px; padding: 24px; margin-top: 24px;
+        border-radius: 16px; padding: 24px; margin-top: 24px;
+        box-shadow: var(--shadow);
       }
       button {
         padding: 12px 18px; font-size: 15px; font-weight: 600;
-        border: 0; border-radius: 8px; cursor: pointer;
-        background: var(--accent); color: #fff;
+        border: 0; border-radius: 10px; cursor: pointer;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #fff;
+        box-shadow: 0 6px 14px var(--accent-soft);
+        transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
       }
-      button[disabled] { opacity: .55; cursor: not-allowed; }
-      button.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+      button:hover:not([disabled]) { transform: translateY(-1px); box-shadow: 0 10px 20px var(--accent-soft); }
+      button:active:not([disabled]) { transform: translateY(0); }
+      button[disabled] { opacity: .55; cursor: not-allowed; box-shadow: none; }
+      button.ghost {
+        background: var(--panel-2); color: var(--text);
+        border: 1px solid var(--border); box-shadow: none;
+      }
+      button.ghost:hover:not([disabled]) { border-color: var(--border-strong); }
+      button.primary-lg { width: 100%; padding: 14px 18px; font-size: 15.5px; }
 
       /* Modal */
       .backdrop {
-        position: fixed; inset: 0; background: rgba(0,0,0,.55);
-        display: none; align-items: center; justify-content: center; z-index: 10;
+        position: fixed; inset: 0; background: rgba(8,12,22,.55);
+        backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+        display: none; align-items: center; justify-content: center;
+        z-index: 10; padding: 16px;
       }
-      .backdrop.show { display: flex; }
+      .backdrop.show { display: flex; animation: fade .18s ease; }
+      @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+      @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98) } to { opacity: 1; transform: none } }
       .modal {
         background: var(--panel); border: 1px solid var(--border);
-        border-radius: 14px; padding: 26px; width: 100%; max-width: 420px;
-        box-shadow: 0 20px 50px rgba(0,0,0,.4);
+        border-radius: 16px; padding: 26px; width: 100%; max-width: 440px;
+        box-shadow: var(--shadow-lg);
+        animation: pop .22s cubic-bezier(.2,.8,.2,1);
       }
-      .modal h2 { margin: 0 0 4px; font-size: 20px; }
+      .modal h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: -.01em; }
       .modal p.sub { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
       label {
-        display: block; font-size: 12px; font-weight: 600; margin: 12px 0 6px;
-        color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+        display: block; font-size: 11.5px; font-weight: 600; margin: 14px 0 6px;
+        color: var(--muted); text-transform: uppercase; letter-spacing: .06em;
       }
       input {
         width: 100%; padding: 11px 13px; font-size: 15px;
-        border: 1px solid var(--border); border-radius: 8px;
+        border: 1px solid var(--border); border-radius: 10px;
         background: var(--panel-2); color: var(--text); outline: none;
+        transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
       }
-      input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,140,255,.15); }
+      input::placeholder { color: var(--muted); opacity: .7; }
+      input:hover { border-color: var(--border-strong); }
+      input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
       input.totp {
         font-size: 22px; letter-spacing: 8px; text-align: center;
         font-family: ui-monospace, Menlo, monospace;
       }
-      .actions { display: flex; gap: 10px; margin-top: 20px; }
+      .actions { display: flex; gap: 10px; margin-top: 22px; }
       .actions button { flex: 1; }
 
       /* mobile responsive */
       @media (max-width: 640px) {
         body { font-size: 14px; }
-        .wrap { padding: 28px 14px; }
+        .wrap { padding: 20px 14px; }
+        .topbar { gap: 8px; }
+        .logo { width: 32px; height: 32px; border-radius: 9px; font-size: 13px; }
+        .brand-name { font-size: 14px; }
+        .theme-toggle { width: 36px; height: 36px; }
+        header { margin-top: 24px; }
         h1 { font-size: 22px; }
-        .card { padding: 16px; overflow-wrap: break-word; }
-        .modal { padding: 18px; border-radius: 12px; }
+        header p { font-size: 13.5px; }
+        .card { padding: 16px; overflow-wrap: break-word; border-radius: 14px; }
+        .modal { padding: 20px; border-radius: 14px; }
         .modal h2 { font-size: 18px; }
         input { font-size: 16px; padding: 12px 13px; }   /* prevents iOS focus zoom */
         input.totp { font-size: 20px; letter-spacing: 6px; }
         button { padding: 12px 14px; }
+        .primary-lg { padding: 13px 16px; font-size: 15px; }
         .actions { flex-wrap: wrap; gap: 8px; }
-        .actions button { flex: 1 1 140px; }
+        .actions button { flex: 1 1 140px; min-width: 0; }
         pre { font-size: 11px; max-height: 200px; }
       }
       @media (max-width: 420px) {
-        .wrap { padding: 20px 10px; }
-        h1 { font-size: 18px; }
-        .card { padding: 14px; }
-        .modal { padding: 14px; }
+        .wrap { padding: 16px 12px; }
+        h1 { font-size: 19px; }
+        header p { font-size: 13px; }
+        .card { padding: 14px; border-radius: 12px; }
+        .modal { padding: 16px; border-radius: 12px; }
+        label { margin-top: 12px; }
         input.totp { font-size: 18px; letter-spacing: 4px; }
-        .actions button { flex: 1 1 100%; }
+        .actions { flex-direction: column; }
+        .actions button { flex: 1 1 100%; width: 100%; }
       }
 
       .status {
-        margin-top: 18px; padding: 14px; border-radius: 10px; font-size: 14px;
+        margin-top: 18px; padding: 14px; border-radius: 12px; font-size: 14px;
         background: var(--panel-2); border: 1px solid var(--border); display: none;
       }
       .status.show { display: block; }
-      .status.ok { border-color: rgba(33,192,122,.5); }
-      .status.err { border-color: rgba(255,93,108,.5); color: var(--danger); }
+      .status.ok { border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); background: color-mix(in srgb, var(--ok) 10%, var(--panel-2)); }
+      .status.err { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--panel-2)); }
       pre {
         margin: 12px 0 0; padding: 12px; background: var(--panel-2);
-        border: 1px solid var(--border); border-radius: 8px;
+        border: 1px solid var(--border); border-radius: 10px;
         font: 12px/1.45 ui-monospace, Menlo, monospace;
         max-height: 280px; overflow: auto; white-space: pre-wrap; word-break: break-word;
       }
     </style>
+    <script>
+      // Set theme as early as possible to avoid FOUC
+      (function() {
+        var saved = null;
+        try { saved = localStorage.getItem("theme"); } catch {}
+        var pref = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", saved || pref);
+      })();
+    </script>
   </head>
   <body>
     <div class="wrap">
+      <div class="topbar">
+        <div class="brand">
+          <div class="logo">A1</div>
+          <div class="brand-name">Angel One</div>
+        </div>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme" title="Toggle theme">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+        </button>
+      </div>
+
       <header>
-        <h1>Angel One — Login</h1>
-        <p>Click the button to open the login popup. Enter your TOTP and submit.</p>
+        <h1>Sign in to Angel One</h1>
+        <p>Click the button below to open the secure login form. Enter your TOTP and submit.</p>
       </header>
 
       <div class="card">
-        <button id="openBtn" type="button">Login to Angel One</button>
+        <button id="openBtn" class="primary-lg" type="button">Login to Angel One</button>
         <div id="status" class="status"></div>
         <pre id="raw" style="display:none;"></pre>
       </div>
@@ -174,6 +281,16 @@
       })();
 
       const $ = (id) => document.getElementById(id);
+
+      // Theme toggle
+      const themeToggle = $("themeToggle");
+      themeToggle.addEventListener("click", () => {
+        const cur = document.documentElement.getAttribute("data-theme") || "dark";
+        const next = cur === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        try { localStorage.setItem("theme", next); } catch {}
+      });
+
       const backdrop = $("backdrop");
       const statusEl = $("status");
       const raw = $("raw");
