@@ -700,9 +700,36 @@
         localStorage.removeItem("apiKey");
       }
       function authHeaders() { return { Authorization: "Bearer " + getToken() }; }
+      // On a 401, give the shared server-side session one chance to hand us a
+      // freshly-rotated JWT before bouncing the user to the login screen.
+      let _refreshing = null;
+      async function tryServerRefresh() {
+        if (_refreshing) return _refreshing;
+        _refreshing = (async () => {
+          try {
+            const r = await fetch("/api/angel/session");
+            if (!r.ok) return false;
+            const j = await r.json();
+            if (!j.ok || !j.jwtToken) return false;
+            const cur = localStorage.getItem("jwtToken");
+            if (j.jwtToken === cur) return false; // same dead token, no progress
+            localStorage.setItem("jwtToken", j.jwtToken);
+            if (j.refreshToken) localStorage.setItem("refreshToken", j.refreshToken);
+            if (j.feedToken) localStorage.setItem("feedToken", j.feedToken);
+            return true;
+          } catch { return false; }
+          finally { setTimeout(() => { _refreshing = null; }, 1000); }
+        })();
+        return _refreshing;
+      }
       function handle401(res) {
-        if (res.status === 401) { clearAuth(); window.location.href = "/index.html"; return true; }
-        return false;
+        if (res.status !== 401) return false;
+        // Fire-and-forget refresh; if it works the next poll succeeds. If
+        // not, send the user to the login page on the following 401.
+        tryServerRefresh().then(ok => {
+          if (!ok) { clearAuth(); window.location.href = "/index.html"; }
+        });
+        return true;
       }
       if (!getToken()) { window.location.href = "/index.html"; }
       localStorage.removeItem("apiKey");

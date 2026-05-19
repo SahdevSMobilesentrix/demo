@@ -17,7 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pino from "pino";
-import { loginAngelOne } from "./brokers/angelone.js";
+import { loginAngelOne, refreshAngelSession } from "./brokers/angelone.js";
 import { nowIST } from "./dateUtils.js";
 import {
   startOiTest,
@@ -134,15 +134,108 @@ function loadSharedSession() {
   }
 }
 
-// Rehydrate apiKey cache + auto-start runners from any saved session.
-const _bootSession = loadSharedSession();
-if (_bootSession) {
-  rememberApiKey(_bootSession.jwtToken, _bootSession.apiKey);
-  startOiTest({ jwtToken: _bootSession.jwtToken, apiKey: _bootSession.apiKey })
-    .then(r => log.info({ status: r.status }, "oi tracker resumed from saved session"))
-    .catch(e => log.warn({ err: e.message }, "oi tracker resume failed"));
+function clearSharedSession() {
+  try { if (nodeFs.existsSync(SESSION_FILE)) nodeFs.unlinkSync(SESSION_FILE); } catch {}
+}
+
+// Restart the OI runner with a freshly-rotated JWT. The runner closes over
+// its jwtToken, so we stop it, wait for it to wind down, then start again.
+async function restartOiWithToken(jwtToken, apiKey) {
+  try {
+    stopOiTest();
+    // Wait up to ~6s for the runner loop to actually exit.
+    for (let i = 0; i < 60; i++) {
+      const s = getOiState();
+      if (!s || s.status === "finished" || s.status === "error" || s.status === "stopped") break;
+      await new Promise(r => setTimeout(r, 100));
+    }
+    await startOiTest({ jwtToken, apiKey });
+  } catch (e) {
+    log.warn({ err: e.message }, "oi tracker restart after refresh failed");
+  }
+}
+
+// Try to rotate the saved session using its refreshToken. Returns the new
+// session on success, or null if Angel refused (session is dead → re-login).
+async function tryRefreshSharedSession() {
+  const cur = loadSharedSessionRaw();
+  if (!cur?.refreshToken || !cur?.apiKey) return null;
+  try {
+    const out = await refreshAngelSession({
+      apiKey: cur.apiKey,
+      refreshToken: cur.refreshToken,
+    });
+    const next = {
+      jwtToken: out.jwtToken,
+      refreshToken: out.refreshToken || cur.refreshToken,
+      feedToken: out.feedToken || cur.feedToken,
+      apiKey: cur.apiKey,
+      savedAt: Date.now(),
+    };
+    saveSharedSession(next);
+    // Migrate in-memory apiKey mapping to the new jwt.
+    apiKeyByJwt.delete(cur.jwtToken);
+    rememberApiKey(next.jwtToken, next.apiKey);
+    log.info("angel session refreshed (new jwt issued)");
+    // Restart runner so it uses the new jwt; signal engine is fine to leave.
+    restartOiWithToken(next.jwtToken, next.apiKey);
+    return next;
+  } catch (e) {
+    log.warn({ err: e.message }, "angel session refresh failed — forcing re-login");
+    clearSharedSession();
+    apiKeyByJwt.delete(cur.jwtToken);
+    stopOiTest();
+    return null;
+  }
+}
+
+// Variant of loadSharedSession() that returns the blob even if its jwt
+// already expired (so we can still grab the refreshToken).
+function loadSharedSessionRaw() {
+  try {
+    if (!nodeFs.existsSync(SESSION_FILE)) return null;
+    return decryptSession(nodeFs.readFileSync(SESSION_FILE));
+  } catch { return null; }
+}
+
+// Scenario 1: proactive refresh. Every minute, if the saved JWT expires in
+// under 5 minutes (or is already expired but a refreshToken exists), rotate.
+const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+let refreshing = false;
+async function refreshTick() {
+  if (refreshing) return;
+  const cur = loadSharedSessionRaw();
+  if (!cur?.jwtToken || !cur?.refreshToken) return;
+  const exp = jwtExpMs(cur.jwtToken);
+  if (exp - Date.now() > REFRESH_MARGIN_MS) return;
+  refreshing = true;
+  try { await tryRefreshSharedSession(); }
+  finally { refreshing = false; }
+}
+setInterval(() => { refreshTick().catch(() => {}); }, 60 * 1000).unref?.();
+
+// Rehydrate apiKey cache + auto-start runners from any saved session. If the
+// boot-time JWT is already close to expiring, refresh once before starting.
+async function bootFromSession() {
+  let s = loadSharedSession();
+  if (!s) {
+    // Maybe expired but refreshable — try one refresh.
+    const raw = loadSharedSessionRaw();
+    if (raw?.refreshToken && raw?.apiKey) {
+      s = await tryRefreshSharedSession();
+    }
+  }
+  if (!s) return;
+  rememberApiKey(s.jwtToken, s.apiKey);
+  try {
+    const r = await startOiTest({ jwtToken: s.jwtToken, apiKey: s.apiKey });
+    log.info({ status: r.status }, "oi tracker resumed from saved session");
+  } catch (e) {
+    log.warn({ err: e.message }, "oi tracker resume failed");
+  }
   try { startSignalAuto({ symbol: "NIFTY" }); } catch {}
 }
+bootFromSession().catch(() => {});
 
 function bearerToken(req) {
   const h = req.headers.authorization || "";
@@ -160,9 +253,16 @@ function requireAuth(req, res, next) {
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 // Shared session endpoint: returns the most recent valid login so any visitor
-// can use the app without their own credentials.
-app.get("/api/angel/session", (_req, res) => {
-  const s = loadSharedSession();
+// can use the app without their own credentials. If the saved JWT is expired
+// but a refreshToken is available, transparently rotate it before responding.
+app.get("/api/angel/session", async (_req, res) => {
+  let s = loadSharedSession();
+  if (!s) {
+    const raw = loadSharedSessionRaw();
+    if (raw?.refreshToken && raw?.apiKey) {
+      s = await tryRefreshSharedSession();
+    }
+  }
   if (!s) return res.json({ ok: false });
   res.json({
     ok: true,

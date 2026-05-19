@@ -11,6 +11,8 @@ import axios from "axios";
 
 const LOGIN_URL =
   "https://apiconnect.angelone.in/rest/auth/angelbroking/user/v1/loginByPassword";
+const REFRESH_URL =
+  "https://apiconnect.angelone.in/rest/auth/angelbroking/jwt/v1/generateTokens";
 
 export async function loginAngelOne({ apiKey, clientCode, pin, totp }) {
   if (!apiKey || !clientCode || !pin || !totp) {
@@ -43,6 +45,41 @@ export async function loginAngelOne({ apiKey, clientCode, pin, totp }) {
     throw err;
   }
 
+  return {
+    jwtToken: data.data.jwtToken,
+    refreshToken: data.data.refreshToken,
+    feedToken: data.data.feedToken,
+    raw: data,
+  };
+}
+
+// Exchange a refreshToken for a fresh set of tokens (no TOTP needed).
+// Throws on failure — caller should treat that as "session is dead, force re-login".
+export async function refreshAngelSession({ apiKey, refreshToken }) {
+  if (!apiKey || !refreshToken) {
+    throw new Error("apiKey and refreshToken are required");
+  }
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "X-UserType": "USER",
+    "X-SourceID": "WEB",
+    "X-ClientLocalIP": "127.0.0.1",
+    "X-ClientPublicIP": "127.0.0.1",
+    "X-MACAddress": "00:00:00:00:00:00",
+    "X-PrivateKey": apiKey,
+  };
+  const { data } = await axios.post(
+    REFRESH_URL,
+    { refreshToken },
+    { headers, timeout: 15000, validateStatus: () => true }
+  );
+  if (!data || data.status === false || !data.data) {
+    const msg = data?.message || data?.errorcode || "token refresh failed";
+    const err = new Error(msg);
+    err.raw = data;
+    throw err;
+  }
   return {
     jwtToken: data.data.jwtToken,
     refreshToken: data.data.refreshToken,
