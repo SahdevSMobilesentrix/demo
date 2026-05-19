@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Angel One — Login</title>
+    <title>Login</title>
     <style>
       :root[data-theme="light"] {
         color-scheme: light;
@@ -214,7 +214,7 @@
       <div class="topbar">
         <div class="brand">
           <div class="logo">A1</div>
-          <div class="brand-name">Angel One</div>
+          <div class="brand-name">Login</div>
         </div>
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme" title="Toggle theme">
           <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
@@ -223,12 +223,12 @@
       </div>
 
       <header>
-        <h1>Sign in to Angel One</h1>
+        <h1>Sign in</h1>
         <p>Click the button below to open the secure login form. Enter your TOTP and submit.</p>
       </header>
 
       <div class="card">
-        <button id="openBtn" class="primary-lg" type="button">Login to Angel One</button>
+        <button id="openBtn" class="primary-lg" type="button">Login</button>
         <div id="status" class="status"></div>
         <pre id="raw" style="display:none;"></pre>
       </div>
@@ -236,7 +236,7 @@
 
     <div id="backdrop" class="backdrop" role="dialog" aria-modal="true">
       <div class="modal">
-        <h2>Angel One Login</h2>
+        <h2>Login</h2>
         <p class="sub">Fill in your credentials and the 6-digit TOTP from your authenticator app.</p>
 
         <form id="loginForm" autocomplete="off">
@@ -262,22 +262,40 @@
     </div>
 
     <script>
-      // If valid token exists, skip login
-      (function() {
-        const token = localStorage.getItem("jwtToken");
-        if (token) {
-          try {
-            const payload = JSON.parse(atob(token.split(".")[1]));
-            if (payload.exp && payload.exp * 1000 > Date.now()) {
+      // If a valid token exists (locally or shared from server), skip login.
+      function isJwtValid(token) {
+        if (!token) return false;
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          return payload.exp && payload.exp * 1000 > Date.now();
+        } catch { return false; }
+      }
+      (async function() {
+        const localTok = localStorage.getItem("jwtToken");
+        if (isJwtValid(localTok)) {
+          window.location.href = "/oi.html";
+          return;
+        }
+        // No valid local token — try the shared server-side session so that
+        // anyone (friend/family) can use the app once it's been logged in once.
+        try {
+          const r = await fetch("/api/angel/session");
+          if (r.ok) {
+            const j = await r.json();
+            if (j.ok && isJwtValid(j.jwtToken)) {
+              localStorage.setItem("jwtToken", j.jwtToken);
+              if (j.refreshToken) localStorage.setItem("refreshToken", j.refreshToken);
+              if (j.feedToken) localStorage.setItem("feedToken", j.feedToken);
+              localStorage.removeItem("apiKey");
               window.location.href = "/oi.html";
               return;
             }
-            // Token expired — clear and show login
-            localStorage.removeItem("jwtToken");
-            localStorage.removeItem("refreshToken");
-            localStorage.removeItem("feedToken");
-          } catch {}
-        }
+          }
+        } catch {}
+        // Nothing valid — clear any stale local tokens and show login.
+        localStorage.removeItem("jwtToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("feedToken");
       })();
 
       const $ = (id) => document.getElementById(id);
@@ -344,7 +362,7 @@
         }
         submitBtn.disabled = true;
         submitBtn.textContent = "Logging in…";
-        setStatus("", "Sending login request to Angel One…");
+        setStatus("", "Sending login request…");
         try {
           const r = await fetch("/api/angel/login", {
             method: "POST",

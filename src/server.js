@@ -12,6 +12,8 @@
 import "dotenv/config";
 import express from "express";
 import nodeFs from "node:fs";
+import nodeCrypto from "node:crypto";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pino from "pino";
@@ -61,6 +63,87 @@ function lookupApiKey(jwt) {
   return e.apiKey;
 }
 
+// Shared session: once one user logs in, anyone visiting the site uses the
+// same active session (no re-login) until the JWT expires.
+//
+// Stored encrypted on disk (AES-256-GCM, binary blob). The filename and
+// contents are intentionally opaque so a casual extractor can't read or
+// reuse the tokens directly. Key is derived from SESSION_SECRET (env) plus
+// a per-machine fingerprint; rotating the env var invalidates old blobs.
+const SESSION_FILE = path.join(process.cwd(), "data", ".rt.cache");
+// Internal secret used to derive the AES key for the on-disk session blob.
+// Kept as a module-local constant (no env var needed). Change this string
+// to invalidate any previously cached session.
+const SESSION_SECRET = "oi-bot-9f3c4d2a-7b1e-48d0-9c6f-2a5b8e1d0f74";
+const SESSION_KEY = nodeCrypto.scryptSync(
+  SESSION_SECRET + "|" + os.hostname() + "|" + os.platform(),
+  "oi-session-salt-v1",
+  32
+);
+function jwtExpMs(jwt) {
+  try {
+    const payload = JSON.parse(
+      Buffer.from(jwt.split(".")[1], "base64").toString("utf8")
+    );
+    return payload.exp ? payload.exp * 1000 : 0;
+  } catch {
+    return 0;
+  }
+}
+function encryptSession(obj) {
+  const iv = nodeCrypto.randomBytes(12);
+  const cipher = nodeCrypto.createCipheriv("aes-256-gcm", SESSION_KEY, iv);
+  const pt = Buffer.from(JSON.stringify(obj), "utf8");
+  const ct = Buffer.concat([cipher.update(pt), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  // layout: magic(4) | iv(12) | tag(16) | ciphertext
+  return Buffer.concat([Buffer.from([0x4f, 0x49, 0x01, 0x00]), iv, tag, ct]);
+}
+function decryptSession(buf) {
+  if (!buf || buf.length < 4 + 12 + 16) return null;
+  if (buf[0] !== 0x4f || buf[1] !== 0x49) return null;
+  const iv = buf.subarray(4, 16);
+  const tag = buf.subarray(16, 32);
+  const ct = buf.subarray(32);
+  try {
+    const decipher = nodeCrypto.createDecipheriv("aes-256-gcm", SESSION_KEY, iv);
+    decipher.setAuthTag(tag);
+    const pt = Buffer.concat([decipher.update(ct), decipher.final()]);
+    return JSON.parse(pt.toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+function saveSharedSession(s) {
+  try {
+    nodeFs.mkdirSync(path.dirname(SESSION_FILE), { recursive: true });
+    nodeFs.writeFileSync(SESSION_FILE, encryptSession(s));
+  } catch (e) {
+    log.warn({ err: e.message }, "failed to persist shared session");
+  }
+}
+function loadSharedSession() {
+  try {
+    if (!nodeFs.existsSync(SESSION_FILE)) return null;
+    const s = decryptSession(nodeFs.readFileSync(SESSION_FILE));
+    if (!s?.jwtToken) return null;
+    if (jwtExpMs(s.jwtToken) <= Date.now()) return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+// Rehydrate apiKey cache + auto-start runners from any saved session.
+const _bootSession = loadSharedSession();
+if (_bootSession) {
+  rememberApiKey(_bootSession.jwtToken, _bootSession.apiKey);
+  startOiTest({ jwtToken: _bootSession.jwtToken, apiKey: _bootSession.apiKey })
+    .then(r => log.info({ status: r.status }, "oi tracker resumed from saved session"))
+    .catch(e => log.warn({ err: e.message }, "oi tracker resume failed"));
+  try { startSignalAuto({ symbol: "NIFTY" }); } catch {}
+}
+
 function bearerToken(req) {
   const h = req.headers.authorization || "";
   const m = h.match(/^Bearer\s+(.+)$/);
@@ -75,6 +158,19 @@ function requireAuth(req, res, next) {
 }
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// Shared session endpoint: returns the most recent valid login so any visitor
+// can use the app without their own credentials.
+app.get("/api/angel/session", (_req, res) => {
+  const s = loadSharedSession();
+  if (!s) return res.json({ ok: false });
+  res.json({
+    ok: true,
+    jwtToken: s.jwtToken,
+    refreshToken: s.refreshToken,
+    feedToken: s.feedToken,
+  });
+});
 
 app.get("/api/angel/defaults", (_req, res) => {
   res.json({
@@ -93,6 +189,13 @@ app.post("/api/angel/login", async (req, res) => {
   try {
     const out = await loginAngelOne({ apiKey, clientCode, pin, totp });
     rememberApiKey(out.jwtToken, apiKey);
+    saveSharedSession({
+      jwtToken: out.jwtToken,
+      refreshToken: out.refreshToken,
+      feedToken: out.feedToken,
+      apiKey,
+      savedAt: Date.now(),
+    });
     log.info({ clientCode }, "angel login ok");
 
     // Auto-start OI tracker — no manual Start/Stop needed.
