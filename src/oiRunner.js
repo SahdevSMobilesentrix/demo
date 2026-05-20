@@ -193,7 +193,7 @@ export async function startOiTest({ jwtToken, apiKey }) {
       if (!expiry) throw new Error("No NIFTY weekly expiry found");
       state.expiry = expiry.str;
 
-      const optTokens = pickStrikes(instruments, expiry.str, atm);
+      let optTokens = pickStrikes(instruments, expiry.str, atm);
       if (optTokens.length === 0) throw new Error("No option tokens resolved around ATM");
 
       // In-memory only — never persisted.
@@ -232,6 +232,15 @@ export async function startOiTest({ jwtToken, apiKey }) {
           const q = await fetchQuotes(jwtToken, apiKey, tokens);
           const idx = q.NIFTY50 || {};
           const curSpot = idx.ltp ?? spot;
+
+          // Dynamic ATM: follow live spot. If the strike has moved, rebuild
+          // the option-token window so next poll covers the new ATM ±10.
+          const newAtm = Math.round(curSpot / STRIKE_STEP) * STRIKE_STEP;
+          if (newAtm !== state.atm) {
+            state.atm = newAtm;
+            const rebuilt = pickStrikes(instruments, expiry.str, newAtm);
+            if (rebuilt.length > 0) optTokens = rebuilt;
+          }
           state.ohlc = {
             ltp: idx.ltp ?? null,
             open: idx.open ?? null,
@@ -281,7 +290,7 @@ export async function startOiTest({ jwtToken, apiKey }) {
                 peLtp: cur.pe?.ltp ?? null,
                 ceDelta: (ceCur != null && ceRef != null) ? ceCur - ceRef : null,
                 peDelta: (peCur != null && peRef != null) ? peCur - peRef : null,
-                atm: strike === atm,
+                atm: strike === state.atm,
               };
             });
           state.strikes = strikes;
