@@ -9,6 +9,9 @@ import { marketStatus as getMarketStatus } from "./marketClock.js";
 
 const POLL_SEC = 180;
 const LOOKBACK_MIN = 15;
+// Strike chain uses a longer window so build-up vs short-covering is readable.
+// 15 min is too noisy for per-strike classification.
+const STRIKE_LOOKBACK_MIN = 60;
 const STRIKE_STEP = 50;
 
 const istNow = () =>
@@ -268,8 +271,8 @@ export async function startOiTest({ jwtToken, apiKey }) {
 
           const latest = { ts: Date.now(), ceTotal, peTotal, spot: curSpot, byStrike };
 
-          // Build per-strike chain view with delta vs LOOKBACK_MIN ago.
-          const cutoff = latest.ts - LOOKBACK_MIN * 60 * 1000;
+          // Build per-strike chain view with delta vs STRIKE_LOOKBACK_MIN ago.
+          const cutoff = latest.ts - STRIKE_LOOKBACK_MIN * 60 * 1000;
           let refTick = null;
           for (const h of history) { if (h.ts <= cutoff) refTick = h; else break; }
           const strikes = Object.keys(byStrike)

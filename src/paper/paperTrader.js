@@ -1,6 +1,6 @@
-// paperTrader.js — long-only paper trading state machine.
-// Reacts to BULL signals (ignores BEAR), opens 1 ATM CE position,
-// monitors it on every poll, closes on STOP / TARGET / TIME / INVALIDATION.
+// paperTrader.js — paper trading state machine, both sides.
+// BULL signal → buy 1 ATM CE. BEAR signal → buy 1 ATM PE.
+// Monitors on every poll, closes on STOP / TARGET / TIME / INVALIDATION.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -186,7 +186,9 @@ export function onEnginePayload(payload) {
 
   if (!payload || !payload.signal) return { action: "monitored_only" };
   const sig = payload.signal;
-  if (sig.side !== "BULL") return { action: "ignored_bear" };
+  if (sig.side !== "BULL" && sig.side !== "BEAR") {
+    return { action: "ignored_unknown_side", side: sig.side };
+  }
 
   return openTradeFromSignal(sig);
 }
@@ -219,13 +221,15 @@ function openTradeFromSignal(sig) {
   const lots = settings.defaultLotSize;
   const qty = lotSize * lots;
 
+  const optType = sig.side === "BULL" ? "CE" : "PE";
+
   // pull entry premium from the latest snapshot at the signal's ATM strike
   const snap = latestSnapshot(symbol);
   if (!snap) return { action: "skipped", reason: "no_snapshot_for_entry" };
 
-  const ltpAtm = optionLtpAt(snap, sig.atm, "CE");
+  const ltpAtm = optionLtpAt(snap, sig.atm, optType);
   if (ltpAtm == null || ltpAtm <= 0) {
-    return { action: "skipped", reason: "no_atm_ce_ltp" };
+    return { action: "skipped", reason: `no_atm_${optType.toLowerCase()}_ltp` };
   }
 
   // slippage worsens entry (we pay slightly more)
@@ -241,16 +245,20 @@ function openTradeFromSignal(sig) {
   }
 
   const entryCosts = computeLegCosts(entryPremium, qty, "BUY");
-  const targetSpot = round2(sig.spot * 1.006);    // +0.6%
+  // Engine gives target_pct (+0.006 for BULL, -0.006 for BEAR). Fall back if absent.
+  const tgtPct = Number.isFinite(sig.target_pct)
+    ? sig.target_pct
+    : (sig.side === "BULL" ? 0.006 : -0.006);
+  const targetSpot = round2(sig.spot * (1 + tgtPct));
 
   const trade = {
     id: nextTradeId(today, all),
     date: today,
-    side: "BULL",
+    side: sig.side,
     status: "OPEN",
     symbol,
     atmStrike: sig.atm,
-    optType: "CE",
+    optType,
     lotSize,
     lots,
     entry: {
@@ -301,8 +309,15 @@ export function monitorOpenTrade(latestScore = null) {
 
   let reason = null;
   const ms = getMarketStatus();
-  if (spot != null && spot <= open.entry.invalidationStrike) reason = "STOP";
-  else if (spot != null && spot >= open.entry.targetSpot)    reason = "TARGET";
+  const isBull = open.side === "BULL";
+  // BULL/CE: stop when spot falls to invalidation, target when spot rises to targetSpot.
+  // BEAR/PE: stop when spot rises to invalidation, target when spot falls to targetSpot.
+  if (spot != null && (isBull
+        ? spot <= open.entry.invalidationStrike
+        : spot >= open.entry.invalidationStrike))             reason = "STOP";
+  else if (spot != null && (isBull
+        ? spot >= open.entry.targetSpot
+        : spot <= open.entry.targetSpot))                     reason = "TARGET";
   else if (lowScoreBars >= 2)                                 reason = "INVALIDATION";
   else if (isPast15IST())                                     reason = "TIME";
   else if (!ms.trading && ms.status !== "closed_premarket")   reason = "TIME";   // weekend/holiday/post-close orphan

@@ -1,0 +1,1083 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Indian Stock Market — Zero to Advanced</title>
+<style>
+  @page {
+    size: A4;
+    margin: 22mm 18mm 22mm 18mm;
+    @bottom-center { content: counter(page); font-family: Georgia, serif; font-size: 10pt; color: #555; }
+  }
+  @page :first { @bottom-center { content: ""; } }
+
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 11pt;
+    line-height: 1.55;
+    color: #1a1a1a;
+    margin: 0;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    color: #0f2747;
+    line-height: 1.25;
+  }
+  h1 { font-size: 26pt; margin: 0 0 8pt 0; }
+  h2 { font-size: 18pt; margin: 28pt 0 10pt 0; border-bottom: 1px solid #c9d2df; padding-bottom: 4pt; }
+  h3 { font-size: 13pt; margin: 18pt 0 6pt 0; color: #1f4276; }
+  h4 { font-size: 11.5pt; margin: 12pt 0 4pt 0; color: #2a4a7a; }
+
+  p { margin: 6pt 0; }
+  ul, ol { margin: 6pt 0 6pt 0; padding-left: 20pt; }
+  li { margin: 2pt 0; }
+
+  code, .mono {
+    font-family: "JetBrains Mono", Consolas, Menlo, monospace;
+    font-size: 9.5pt;
+    background: #f1f3f7;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10pt 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid #cbd2dc;
+    padding: 5pt 7pt;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: #eaf0fa; font-family: "Helvetica Neue", Arial, sans-serif; color: #1f4276; }
+
+  blockquote {
+    margin: 8pt 0;
+    padding: 6pt 12pt;
+    border-left: 3px solid #4a78c2;
+    background: #f5f8fd;
+    color: #2a3a55;
+    font-style: italic;
+  }
+
+  .callout {
+    border: 1px solid #d4dbe6;
+    background: #fafbfd;
+    padding: 8pt 12pt;
+    margin: 10pt 0;
+    border-radius: 4px;
+    page-break-inside: avoid;
+  }
+  .callout .label {
+    display: inline-block;
+    background: #1f4276;
+    color: #fff;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 9pt;
+    padding: 1px 8px;
+    border-radius: 3px;
+    margin-bottom: 6pt;
+  }
+
+  .cover {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    page-break-after: always;
+  }
+  .cover .eyebrow { font-family: "Helvetica Neue", Arial, sans-serif; letter-spacing: 4pt; color: #4a78c2; font-size: 11pt; margin-bottom: 18pt; }
+  .cover h1 { font-size: 36pt; max-width: 14cm; color: #0f2747; }
+  .cover .sub { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 14pt; color: #4a5a78; margin-top: 14pt; }
+  .cover .byline { margin-top: 60pt; font-family: "Helvetica Neue", Arial, sans-serif; color: #6b7a93; font-size: 10pt; }
+  .cover .accent {
+    width: 80pt;
+    height: 4pt;
+    background: linear-gradient(90deg, #1f4276, #6fa8dc);
+    margin: 22pt 0 18pt 0;
+  }
+
+  .toc {
+    page-break-after: always;
+  }
+  .toc h2 { border-bottom: none; }
+  .toc ol { list-style: none; padding-left: 0; }
+  .toc li {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px dotted #c9d2df;
+    padding: 6pt 0;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 11pt;
+  }
+  .toc li .title { color: #0f2747; }
+  .toc li .pg { color: #6b7a93; }
+
+  .chapter {
+    page-break-before: always;
+  }
+  .chapter-head {
+    margin-bottom: 20pt;
+  }
+  .chapter-head .num {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    color: #4a78c2;
+    letter-spacing: 3pt;
+    font-size: 10pt;
+  }
+  .chapter-head h1 { font-size: 28pt; margin-top: 6pt; }
+
+  .done-check { background: #fff8e6; border: 1px solid #f0d894; border-radius: 4px; padding: 10pt 14pt; margin: 14pt 0; }
+  .done-check h4 { margin-top: 0; color: #8a6d24; }
+  .done-check ul { margin: 4pt 0 0 0; }
+
+  .exercise { background: #ecf6ec; border: 1px solid #b9d8b9; border-radius: 4px; padding: 10pt 14pt; margin: 14pt 0; }
+  .exercise h4 { margin-top: 0; color: #2c5d2c; }
+
+  .tag { display: inline-block; background: #e6ecf5; color: #1f4276; font-size: 9pt; padding: 1px 6px; border-radius: 3px; font-family: "Helvetica Neue", Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<!-- ===================== COVER ===================== -->
+<section class="cover">
+  <div class="eyebrow">A PRACTICAL FIELD GUIDE</div>
+  <h1>Indian Stock Market</h1>
+  <div class="accent"></div>
+  <h1 style="font-size:22pt; color:#4a78c2;">Zero to Advanced</h1>
+  <div class="sub">Cash · F&amp;O · Participants · Post-Market Data</div>
+  <div class="byline">
+    Prepared for Shailesh<br/>
+    Companion to the weekly F&amp;O paper-trading bot · 2026
+  </div>
+</section>
+
+<!-- ===================== TOC ===================== -->
+<section class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><span class="title">Foreword — How to read this book</span><span class="pg">3</span></li>
+    <li><span class="title">Phase 0 — Foundations</span><span class="pg">4</span></li>
+    <li><span class="title">Phase 1 — Market Structure &amp; Segments</span><span class="pg">7</span></li>
+    <li><span class="title">Phase 2 — Market Participants (FII · DII · Pro · Client)</span><span class="pg">12</span></li>
+    <li><span class="title">Phase 3 — Post-Market Data: where it lives, when it drops</span><span class="pg">16</span></li>
+    <li><span class="title">Phase 4 — Reading the data (interpretation playbook)</span><span class="pg">20</span></li>
+    <li><span class="title">Phase 5 — Derivatives Deep Dive</span><span class="pg">23</span></li>
+    <li><span class="title">Phase 6 — Smart Money Concepts (SMC)</span><span class="pg">27</span></li>
+    <li><span class="title">Phase 7 — Advanced &amp; Quantitative</span><span class="pg">34</span></li>
+    <li><span class="title">Appendix A — The 90-day plan</span><span class="pg">37</span></li>
+    <li><span class="title">Appendix B — Glossary</span><span class="pg">38</span></li>
+  </ol>
+</section>
+
+<!-- ===================== FOREWORD ===================== -->
+<section class="chapter">
+  <div class="chapter-head"><div class="num">FOREWORD</div><h1>How to read this book</h1></div>
+
+  <p>This book is built around one premise: <em>you learn markets faster when every concept is tied to an action you can take the same evening</em>. Every chapter pairs theory with a hands-on item — read a CSV, compute a ratio, paper trade a setup — and ends with a small checklist so you know whether you can move on.</p>
+
+  <p>It is India-specific. Numbers, file names, regulators, and timings refer to NSE and BSE. Most of the same ideas hold globally, but the tape, the data sources, and the regulatory mechanics differ — so this stays focused.</p>
+
+  <p>The chapters are sequenced as <strong>Phase 0 → Phase 6</strong>. You can skip ahead, but each phase assumes the one before it. Phase 3, which covers participant data after market close, is the chapter most readers will return to repeatedly — bookmark it.</p>
+
+  <p>Two recurring boxes:</p>
+  <ul>
+    <li><span class="tag">EXERCISE</span> a small, concrete task — usually 10–30 minutes.</li>
+    <li><span class="tag">DONE CHECK</span> the questions you should be able to answer before moving on.</li>
+  </ul>
+
+  <blockquote>Read with NSE's website open in another tab. Most of the value is in actually pulling the reports the book references and looking at the columns yourself.</blockquote>
+</section>
+
+<!-- ===================== PHASE 0 ===================== -->
+<section class="chapter">
+  <div class="chapter-head"><div class="num">PHASE 0</div><h1>Foundations</h1></div>
+
+  <p>Before any chart, any indicator, any strategy — there is the plumbing. What is a share, what is an exchange, who oversees them, and how does an order placed from your phone reach a matching engine, get matched, and become a holding in your demat account.</p>
+
+  <h2>0.1 What a share actually is</h2>
+  <p>A share is a fractional ownership claim on a company. Owning one share of <em>Reliance Industries</em> entitles you to a proportional slice of dividends declared, voting rights (one vote per share for ordinary shares), and a claim on residual assets in liquidation. The price of that share on any given day is whatever the marginal buyer and marginal seller agree on — not the company's "true" value, and not its book value.</p>
+
+  <p>Two layers of market exist for that share:</p>
+  <ul>
+    <li><strong>Primary market</strong> — where shares are <em>created</em>. IPO (Initial Public Offering), FPO (Follow-on), rights issue, QIP. Money flows from investor to company.</li>
+    <li><strong>Secondary market</strong> — where existing shares change hands between investors. NSE, BSE. Money flows from buyer to seller; the company is uninvolved.</li>
+  </ul>
+
+  <h2>0.2 Exchanges, depositories, brokers</h2>
+  <table>
+    <tr><th>Role</th><th>Entity</th><th>What they do</th></tr>
+    <tr><td>Exchange</td><td>NSE, BSE</td><td>Match buyers and sellers. Run the order book.</td></tr>
+    <tr><td>Clearing corp</td><td>NCL (NSE), ICCL (BSE)</td><td>Guarantee trade settlement. Sit between you and counterparty.</td></tr>
+    <tr><td>Depository</td><td>NSDL, CDSL</td><td>Hold your shares electronically (demat).</td></tr>
+    <tr><td>Depository participant</td><td>Your broker</td><td>Your interface to NSDL/CDSL.</td></tr>
+    <tr><td>Broker</td><td>Zerodha, Upstox, ICICI Direct…</td><td>Route your orders to exchanges.</td></tr>
+    <tr><td>Regulator</td><td>SEBI</td><td>Writes the rules. Disciplines everyone above.</td></tr>
+    <tr><td>Monetary regulator</td><td>RBI</td><td>Interest rates, currency, banking liquidity.</td></tr>
+  </table>
+
+  <h2>0.3 Indices</h2>
+  <p>An index is a number that summarises a basket of stocks. The ones that matter for your bot:</p>
+  <ul>
+    <li><strong>NIFTY 50</strong> — 50 large-cap NSE stocks, free-float market-cap weighted. The most-traded index on the planet by contract volume.</li>
+    <li><strong>BANK NIFTY</strong> — 12 banking stocks. Very volatile; popular for intraday options.</li>
+    <li><strong>FINNIFTY</strong> — broader financial services (banks + NBFCs + insurance).</li>
+    <li><strong>MIDCPNIFTY</strong> — mid-cap.</li>
+    <li><strong>SENSEX</strong> — BSE's 30-stock flagship. Similar role to NIFTY 50 but on BSE.</li>
+  </ul>
+
+  <h2>0.4 Order types you will use today</h2>
+  <ul>
+    <li><strong>Market order</strong> — fills at best available price. Fast, but slippage-prone in illiquid contracts.</li>
+    <li><strong>Limit order</strong> — fills only at your price or better. Default choice for anything except urgent exits.</li>
+    <li><strong>Stop-loss</strong> — sits dormant until a trigger price is hit, then becomes a market or limit order (SL-M / SL).</li>
+    <li><strong>GTT (Good-Till-Triggered)</strong> — broker-side trigger that survives across sessions (up to one year).</li>
+  </ul>
+
+  <h2>0.5 Settlement: T+1</h2>
+  <p>India moved to T+1 settlement for all equities by January 2023, and is rolling out T+0 (same-day) and instant settlement in beta. For F&amp;O, daily MTM (mark-to-market) is settled in cash; final settlement at expiry is cash for index derivatives and <em>physical delivery</em> for stock derivatives.</p>
+
+  <div class="callout">
+    <div class="label">WHY PHYSICAL DELIVERY MATTERS</div>
+    If you hold an in-the-money Reliance call on expiry day and don't square off, you must take delivery of the underlying shares — full contract value, not just the option premium. Many retail traders have been wiped out by forgetting this. Index options (NIFTY, BANKNIFTY) are cash-settled, so the bot is safe.
+  </div>
+
+  <h2>0.6 The cost stack on every trade</h2>
+  <table>
+    <tr><th>Component</th><th>Rate (typical, 2026)</th><th>Notes</th></tr>
+    <tr><td>Brokerage</td><td>₹20 per executed order or 0.03% (whichever lower)</td><td>Discount brokers</td></tr>
+    <tr><td>STT (Securities Txn Tax)</td><td>0.1% delivery; 0.025% intraday sell; 0.0625% options sell (on premium); 0.125% on exercised ITM options (on settlement value)</td><td>The STT trap on ITM options expiry is brutal</td></tr>
+    <tr><td>Exchange transaction charge</td><td>~0.00322% (NSE equity); options ~0.03503% on premium</td><td>Changes occasionally</td></tr>
+    <tr><td>GST</td><td>18% on (brokerage + txn charges)</td><td></td></tr>
+    <tr><td>SEBI turnover fee</td><td>₹10 per crore</td><td>Negligible</td></tr>
+    <tr><td>Stamp duty</td><td>0.003% delivery; 0.002% options</td><td>On buy side only</td></tr>
+  </table>
+  <p>Your bot's <code>costs.js</code> already models this stack — open it after reading this and you'll recognise every line.</p>
+
+  <div class="exercise">
+    <h4>Exercise — Phase 0</h4>
+    <ol>
+      <li>Open your broker app. Place a paper/AMO limit order on one share of any large-cap. Cancel it before execution. Note the screen flow.</li>
+      <li>Open your CDSL/NSDL holdings via CAS email. Identify which depository holds your shares.</li>
+      <li>For one of your existing F&amp;O trades, manually compute the cost stack from the table above and compare to the contract note. They should match to the rupee.</li>
+    </ol>
+  </div>
+
+  <div class="done-check">
+    <h4>Done check</h4>
+    <ul>
+      <li>You can explain order → exchange match → clearing → depository → demat in one paragraph.</li>
+      <li>You know the difference between primary and secondary market.</li>
+      <li>You can name the four regulators / utilities (SEBI, RBI, NSDL/CDSL, NCL/ICCL) and what each does.</li>
+      <li>You can compute total cost on a hypothetical NIFTY option trade by hand.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== PHASE 1 ===================== -->
+<section class="chapter">
+  <div class="chapter-head"><div class="num">PHASE 1</div><h1>Market Structure &amp; Segments</h1></div>
+
+  <p>This is the chapter where you learn the geography of an Indian trading day. Where orders go. When they're allowed. What gates them. What the exchange publishes when the bell rings.</p>
+
+  <h2>1.1 The five segments on NSE</h2>
+  <table>
+    <tr><th>Segment</th><th>What trades</th><th>Product codes</th><th>Settlement</th></tr>
+    <tr><td>Cash / Equity</td><td>Shares for delivery or intraday</td><td>CNC, MIS</td><td>T+1</td></tr>
+    <tr><td>Equity Derivatives (F&amp;O)</td><td>Index &amp; stock futures + options</td><td>NRML, MIS</td><td>T+1 cash; physical for stock contracts</td></tr>
+    <tr><td>Currency Derivatives</td><td>USDINR, EURINR, etc.</td><td>NRML, MIS</td><td>T+1</td></tr>
+    <tr><td>Commodity (MCX)</td><td>Crude, gold, silver, agri</td><td>NRML, MIS</td><td>Varies</td></tr>
+    <tr><td>Debt / G-Sec</td><td>Bonds, T-bills</td><td>—</td><td>T+1</td></tr>
+  </table>
+  <p>Your bot is firmly in row 2 (Index F&amp;O on NIFTY). But row 1 — the underlying cash market — drives everything: when FIIs sell ₹1,200 cr of NIFTY constituents in cash, your CE positions feel it before the OI even prints.</p>
+
+  <h2>1.2 The trading day, to the minute</h2>
+  <table>
+    <tr><th>Window</th><th>IST</th><th>What happens</th></tr>
+    <tr><td>Pre-open: order entry</td><td>09:00 – 09:08</td><td>Orders accepted, modifications allowed, no matching yet</td></tr>
+    <tr><td>Pre-open: match</td><td>09:08 – 09:12</td><td>Call-auction matching; the opening price is discovered here</td></tr>
+    <tr><td>Buffer</td><td>09:12 – 09:15</td><td>Transition to continuous session</td></tr>
+    <tr><td><strong>Normal market</strong></td><td><strong>09:15 – 15:30</strong></td><td>Continuous order matching</td></tr>
+    <tr><td>Closing session</td><td>15:30 – 15:40</td><td>Closing price = volume-weighted average of last 30 minutes</td></tr>
+    <tr><td>Post-close</td><td>15:40 – 16:00</td><td>Cash market only, at the close price</td></tr>
+    <tr><td>EOD reports</td><td>16:00 onward</td><td>Bhavcopy, F&amp;O files, BO/CO publish</td></tr>
+    <tr><td><strong>FII / DII cash provisional</strong></td><td>~17:30 – 18:30</td><td>Today's institutional flows in cash market</td></tr>
+    <tr><td><strong>Participant-wise OI</strong></td><td>~18:00 – 19:00</td><td>Yesterday's F&amp;O participant data (T+1 delay)</td></tr>
+  </table>
+
+  <p>Your <code>marketClock.js</code> gates the signal engine to 09:45–14:00 IST. That's deliberately <em>inside</em> the volatile open (which is 09:15–09:45) and <em>before</em> the pre-close drift (after 14:00). The hour before close is technically tradable but is dominated by squaring-off flow, not directional flow.</p>
+
+  <h2>1.3 Order types you will encounter</h2>
+  <ul>
+    <li><strong>Market</strong> — immediate fill at best price. Avoid in illiquid options where the bid-ask can be 5%+.</li>
+    <li><strong>Limit</strong> — fill at your price or better. Default.</li>
+    <li><strong>SL (Stop-loss limit)</strong> — at trigger, becomes a limit order.</li>
+    <li><strong>SL-M (Stop-loss market)</strong> — at trigger, becomes a market order. <em>Banned</em> on NIFTY and BANKNIFTY options since 2021 because of repeated flash spikes that wiped out retail.</li>
+    <li><strong>GTT</strong> — broker-side, not exchange-side; survives sessions.</li>
+    <li><strong>BO / CO</strong> — discontinued for retail by SEBI in 2020. Do not design around them.</li>
+    <li><strong>AMO</strong> — after-market order; queued for next session's pre-open.</li>
+  </ul>
+
+  <h2>1.4 Circuit limits</h2>
+  <p><strong>Index circuits</strong> are 10% / 15% / 20%. Trading halts for 45 minutes / 1 hour 45 minutes / rest of day, depending on when in the session the band is breached. Triggered four times in NSE's history — Mar 2020 (COVID) twice and 2008 twice.</p>
+  <p><strong>Stock circuits</strong> are per-stock bands of 2% / 5% / 10% / 20%. Stocks in F&amp;O are exempt from daily bands but have a 10% "operating range" that can be widened intraday by the exchange.</p>
+
+  <h2>1.5 Surveillance lists — read these every morning</h2>
+  <table>
+    <tr><th>List</th><th>Meaning</th><th>Trading impact</th></tr>
+    <tr><td>F&amp;O ban list</td><td>Stocks where market-wide OI &gt; 95% of limit</td><td>Only position-reducing trades allowed next day. Published 17:00 IST daily on NSE.</td></tr>
+    <tr><td>ASM (Additional Surveillance Measure)</td><td>Stages I–IV for volatile stocks</td><td>Higher margin, sometimes T2T</td></tr>
+    <tr><td>GSM (Graded Surveillance Measure)</td><td>Stages 0–IV for weak-fundamentals stocks</td><td>T2T, weekly settlement, price freezes</td></tr>
+    <tr><td>T2T (Trade-to-Trade)</td><td>No intraday</td><td>Every trade must be delivered; MIS blocked</td></tr>
+  </table>
+
+  <p>For your bot today this doesn't matter — NIFTY is an index, untouchable by these lists. The moment you expand to stock F&amp;O, the ban list becomes a daily pre-trade check.</p>
+
+  <h2>1.6 Corporate actions and F&amp;O adjustment</h2>
+  <table>
+    <tr><th>Action</th><th>Effect on cash</th><th>Effect on F&amp;O contracts</th></tr>
+    <tr><td>Regular dividend</td><td>Price drops ~div amount ex-date</td><td>Not adjusted if div &lt; 2% of price</td></tr>
+    <tr><td>Special dividend (&gt;2%)</td><td>Same</td><td>Strike + lot size adjusted</td></tr>
+    <tr><td>Stock split (e.g. 1:5)</td><td>Price / shares scaled</td><td>Strike scaled; lot size scaled inversely</td></tr>
+    <tr><td>Bonus issue (1:1)</td><td>Price drops ~half</td><td>Strike + lot size adjusted</td></tr>
+    <tr><td>Rights issue</td><td>Ex-rights theoretical adjustment</td><td>Adjusted by formula</td></tr>
+    <tr><td>Merger / demerger</td><td>Complex</td><td>Contracts revised or expired early</td></tr>
+    <tr><td>Buyback</td><td>None directly</td><td>None</td></tr>
+  </table>
+  <p>Index F&amp;O is unaffected because the index itself absorbs corporate actions through its own divisor adjustment. NIFTY-only traders can park this knowledge until they expand to stocks.</p>
+
+  <h2>1.7 The bhavcopy — your daily artifact</h2>
+  <p>Two NSE files you must know cold:</p>
+
+  <h4>Cash bhavcopy</h4>
+  <p><code>cm{DDMMMYYYY}bhav.csv.zip</code> — e.g. <code>cm20MAY2026bhav.csv.zip</code></p>
+  <p>Columns: <code>SYMBOL, SERIES, OPEN, HIGH, LOW, CLOSE, LAST, PREVCLOSE, TOTTRDQTY, TOTTRDVAL, TIMESTAMP, TOTALTRADES, ISIN</code></p>
+  <p><code>SERIES = EQ</code> is normal equity, <code>BE</code> is trade-to-trade, <code>BZ</code> is GSM stage.</p>
+
+  <h4>F&amp;O bhavcopy</h4>
+  <p><code>fo{DDMMMYYYY}bhav.csv.zip</code></p>
+  <p>Columns: <code>INSTRUMENT, SYMBOL, EXPIRY_DT, STRIKE_PR, OPTION_TYP, OPEN, HIGH, LOW, CLOSE, SETTLE_PR, CONTRACTS, VAL_INLAKH, OPEN_INT, CHG_IN_OI, TIMESTAMP</code></p>
+  <p><code>INSTRUMENT</code> is one of <code>FUTIDX</code> / <code>FUTSTK</code> / <code>OPTIDX</code> / <code>OPTSTK</code>.</p>
+  <p>This is exactly the shape your bot's <code>snapshotReader.js</code> consumes a richer intra-day version of.</p>
+
+  <div class="exercise">
+    <h4>Exercise — Phase 1</h4>
+    <p>Download yesterday's F&amp;O bhavcopy and answer in a spreadsheet:</p>
+    <ol>
+      <li>What was NIFTY's nearest weekly expiry close in <code>FUTIDX</code>?</li>
+      <li>Which NIFTY call strike had the highest <code>OPEN_INT</code>? Which had the highest <code>CHG_IN_OI</code>?</li>
+      <li>Which put strike had the highest <code>OPEN_INT</code>?</li>
+      <li>Compute PCR(OI) = sum(PUT OI) / sum(CALL OI) for nearest expiry. &gt; 1 = bullish skew; &lt; 0.7 = bearish.</li>
+    </ol>
+  </div>
+
+  <div class="done-check">
+    <h4>Done check</h4>
+    <ul>
+      <li>At what IST minute does the opening price get decided?</li>
+      <li>Why is SL-M banned on NIFTY options?</li>
+      <li>If a stock enters the F&amp;O ban list today, what's allowed tomorrow?</li>
+      <li>A stock does a 1:2 split — what happens to its existing 1000-strike CE?</li>
+      <li>Where on NSE's site is yesterday's F&amp;O bhavcopy? What's it called?</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== PHASE 2 ===================== -->
+<section class="chapter">
+  <div class="chapter-head"><div class="num">PHASE 2</div><h1>Market Participants — FII · DII · Pro · Client</h1></div>
+
+  <p>NSE doesn't think of "the market" as a homogeneous crowd. For every F&amp;O instrument it tracks <em>four</em> distinct buckets of traders. Knowing which bucket is on which side of a trade — and how that bucket usually behaves — is the single highest-leverage piece of information available to a retail trader for free.</p>
+
+  <h2>2.1 The four buckets</h2>
+  <table>
+    <tr><th>Code</th><th>Full name</th><th>Who they are</th><th>Behaviour stereotype</th></tr>
+    <tr><td>Client</td><td>Retail + HNI</td><td>Individuals, HUFs, small partnership firms</td><td>Net option <em>buyers</em>. Often herding. Frequently a contra-indicator.</td></tr>
+    <tr><td>DII</td><td>Domestic Institutional Investors</td><td>Indian mutual funds, insurance (LIC the largest), banks' treasury, pension funds (EPFO, NPS)</td><td>Slow, steady, counter-cyclical. Provide liquidity when FIIs sell.</td></tr>
+    <tr><td>FII / FPI</td><td>Foreign Portfolio Investors</td><td>Foreign hedge funds, global mutual funds, sovereign wealth funds, ETF flows</td><td>Trend-setters in cash; sophisticated hedgers in derivatives.</td></tr>
+    <tr><td>Pro</td><td>Proprietary trading desks</td><td>Brokers trading their own balance sheet — Zerodha Prop, Kotak Prop, Edelweiss Prop, etc.</td><td>Short-dated, tactical, well-informed. Often lead the tape by 1–2 sessions.</td></tr>
+  </table>
+
+  <h2>2.2 What each bucket cares about</h2>
+
+  <h3>Client (retail)</h3>
+  <p>Mostly buy options because the headline payoff is "lottery-like" — small premium, theoretically unlimited upside. The aggregate effect is that retail is structurally <em>short gamma</em> for the market makers on the other side. Pattern: heavy CE buying on green days, heavy PE buying on red days; both decay through theta before they pay off.</p>
+
+  <h3>DII</h3>
+  <p>Two flavours. <em>Mutual funds</em> are constrained by SIP inflows — when retail SIPs total ₹15,000 cr/month in 2026, MFs <em>must</em> deploy. That creates a persistent bid in large-cap cash, especially on red days. <em>Insurance/LIC</em> trades much larger blocks, often opportunistic, and increasingly active in index futures for portfolio hedging.</p>
+
+  <h3>FII</h3>
+  <p>Single biggest swing factor in Indian equities. When the dollar index (DXY) rises or US 10Y yields jump, FIIs typically sell EMs including India — even if Indian fundamentals are fine. The flow is part-mechanical (ETF rebalances) and part-discretionary (active funds). FII <em>cash</em> selling drags spot; FII <em>F&amp;O</em> positioning often hedges or anticipates that.</p>
+
+  <h3>Pro</h3>
+  <p>The desk traders inside brokers. Tiny capital relative to FIIs but extremely active and information-rich. Their positioning in index futures and options is the closest free signal to "what the smart short-term money is doing." Watch for divergences: when Pros build longs while Clients build shorts in index futures, the next session is statistically more often green.</p>
+
+  <h2>2.3 The data fields you'll actually see</h2>
+
+  <p>NSE's daily Participant-wise OI file contains, for each of the four codes (Client / DII / FII / Pro):</p>
+  <ul>
+    <li><strong>Future Index Long</strong></li>
+    <li><strong>Future Index Short</strong></li>
+    <li><strong>Future Stock Long</strong></li>
+    <li><strong>Future Stock Short</strong></li>
+    <li><strong>Option Index Call Long</strong></li>
+    <li><strong>Option Index Call Short</strong></li>
+    <li><strong>Option Index Put Long</strong></li>
+    <li><strong>Option Index Put Short</strong></li>
+    <li><strong>Option Stock Long / Short</strong></li>
+    <li><strong>Total Long Contracts</strong> / <strong>Total Short Contracts</strong></li>
+  </ul>
+
+  <p>From those raw fields you compute:</p>
+  <ul>
+    <li><strong>Net position</strong> per bucket per instrument = Long − Short</li>
+    <li><strong>Long/Short ratio</strong> per bucket — useful for index futures specifically</li>
+    <li><strong>Day-over-day delta</strong> on the net — this is the <em>action</em>, not the snapshot</li>
+  </ul>
+
+  <h2>2.4 The classic divergence setups</h2>
+  <table>
+    <tr><th>Configuration</th><th>Typical next-day bias</th></tr>
+    <tr><td>FII net-long futures &amp; rising; Pros net-long &amp; rising; Clients net-short</td><td>Bullish — smart money positioned for up move</td></tr>
+    <tr><td>FII net-short futures while heavy PE writing; Pros also net-short</td><td>Bearish but with limited downside (PE writers expect support)</td></tr>
+    <tr><td>FII short futures + heavy CE buying</td><td>Hedge configuration — they expect volatility, direction unclear</td></tr>
+    <tr><td>Pros flipping from long to short over 2 sessions while Clients add longs</td><td>Bearish — Pros usually lead, retail usually lags</td></tr>
+    <tr><td>DII heavy cash buying while FII sells &gt; ₹3,000 cr</td><td>Slow-bleed market — short-term weakness, long-term floor</td></tr>
+  </table>
+
+  <div class="callout">
+    <div class="label">REMEMBER THE T+1 DELAY</div>
+    Participant-wise OI for <em>today</em> publishes <em>tomorrow</em> evening (~18:00 IST). NSE delays it deliberately to prevent front-running. So when you read FII positioning Tuesday night, it's Monday's snapshot — you act on it Wednesday morning. Plan your routine around this.
+  </div>
+
+  <div class="exercise">
+    <h4>Exercise — Phase 2</h4>
+    <ol>
+      <li>From NSE → Reports → Derivatives → Participant Wise Open Interest, download the latest CSV.</li>
+      <li>For Index Futures, compute Long − Short for each of FII / DII / Client / Pro.</li>
+      <li>Open the previous day's CSV. Compute the day-over-day change in each net.</li>
+      <li>Write three sentences describing what happened. (e.g. "FIIs reduced shorts by 18%, Pros flipped from net short to net long, Clients added longs — bullish setup.")</li>
+    </ol>
+  </div>
+
+  <div class="done-check">
+    <h4>Done check</h4>
+    <ul>
+      <li>You can list the four NSE participant codes and what each represents.</li>
+      <li>You know why the participant file is T+1 and what time it publishes.</li>
+      <li>You can describe at least three diverging configurations between FII / Pro / Client.</li>
+      <li>You can name two structural drivers of DII flows (SIP, insurance).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== PHASE 3 ===================== -->
+<section class="chapter">
+  <div class="chapter-head"><div class="num">PHASE 3</div><h1>Post-Market Data — where it lives, when it drops</h1></div>
+
+  <p>This is the operational chapter. Every evening, between 16:00 and 19:30 IST, NSE and a constellation of aggregators publish the files that determine what an informed trader will trade tomorrow. Below is the full timeline with exact sources.</p>
+
+  <h2>3.1 The end-of-day timeline</h2>
+  <table>
+    <tr><th>Time (IST)</th><th>What publishes</th><th>Where</th></tr>
+    <tr><td>15:30</td><td>Continuous session closes</td><td>—</td></tr>
+    <tr><td>15:40</td><td>Closing price finalised (VWAP last 30 min)</td><td>Live feeds</td></tr>
+    <tr><td>~16:00</td><td>Cash &amp; F&amp;O bhavcopies</td><td><span class="mono">archives.nseindia.com</span></td></tr>
+    <tr><td>~17:00</td><td>F&amp;O ban list for next day</td><td>NSE → Reports → Derivatives</td></tr>
+    <tr><td>~17:30–18:30</td><td><strong>FII / DII cash provisional</strong></td><td>NSE → Reports → FII-DII Trading Activity</td></tr>
+    <tr><td>~18:00–19:00</td><td><strong>Participant-wise OI (T+1)</strong></td><td>NSE → Reports → Derivatives</td></tr>
+    <tr><td>~18:00</td><td>Bulk &amp; Block deals</td><td>NSE → Reports → Equities</td></tr>
+    <tr><td>Rolling</td><td>SAST / Insider disclosures</td><td>NSE / BSE corp filings</td></tr>
+    <tr><td>~21:30 / next 09:00</td><td>FII/DII <em>final</em> figures replace provisional</td><td>Same NSE page</td></tr>
+  </table>
+
+  <h2>3.2 FII / DII cash market activity</h2>
+  <p>The headline number every newspaper and TV channel quotes overnight. Format:</p>
+  <table>
+    <tr><th>Category</th><th>Gross Purchase</th><th>Gross Sale</th><th>Net</th></tr>
+    <tr><td>FII / FPI</td><td>₹ 9,840 cr</td><td>₹ 11,120 cr</td><td>−1,280 cr</td></tr>
+    <tr><td>DII</td><td>₹ 7,210 cr</td><td>₹ 6,320 cr</td><td>+890 cr</td></tr>
+  </table>
+  <p>What you should look at, in order: (1) net sign, (2) magnitude vs 20-day average, (3) is it the 3rd / 4th consecutive day in the same direction, (4) is FII selling matched by DII buying or not.</p>
+
+  <h3>Sources</h3>
+  <ul>
+    <li><strong>NSE</strong> — <span class="mono">nseindia.com → Reports → FII / DII Reports</span></li>
+    <li><strong>BSE</strong> — parallel page on bseindia.com</li>
+    <li><strong>Moneycontrol</strong> — <span class="mono">moneycontrol.com → Markets → FII-DII Activity</span> — has multi-year history in one chart</li>
+  </ul>
+
+  <h2>3.3 Participant-wise Open Interest (the most valuable file)</h2>
+  <p>One CSV per day, one row per participant category, columns for each derivative type.</p>
+  <p>Direct link pattern: <span class="mono">nsearchives.nseindia.com/content/nsccl/fao_participant_oi_{DDMMYYYY}.csv</span></p>
+  <p>It's a small file (~5 KB). Pull it once a day; archive it locally next to your bot's snapshot data and you can backtest participant-driven signals years in.</p>
+
+  <h2>3.4 Participant-wise Volume</h2>
+  <p>Same page on NSE. Same buckets. Tells you <em>activity</em> rather than <em>position</em>. Useful for distinguishing position-building from churn.</p>
+
+  <h2>3.5 Bulk &amp; Block deals</h2>
+  <p>Two file types, distinct definitions:</p>
+  <ul>
+    <li><strong>Bulk deal</strong> — &gt; 0.5% of company's listed shares in a single day (cumulative). Reported by broker by next business day.</li>
+    <li><strong>Block deal</strong> — single trade ≥ ₹10 crore in the block deal window (08:45–09:00 or 14:05–14:20). Both parties matched at a single price.</li>
+  </ul>
+  <p>These name the actual buyer/seller — "Morgan Stanley Mauritius Bought 2.1 cr shares of XYZ at ₹178.40." Track over weeks and you learn which FII/MF is accumulating which stock.</p>
+
+  <h2>3.6 SAST &amp; insider disclosures</h2>
+  <p>Required filings under SEBI's takeover code (SAST) and insider trading regulations. When promoters / directors / large shareholders buy or sell their own company's shares above thresholds, they must disclose within two trading days. Available on NSE/BSE corporate filings pages and aggregated by Trendlyne.</p>
+
+  <h2>3.7 The aggregators worth using</h2>
+  <table>
+    <tr><th>Tool</th><th>What it pre-chews</th></tr>
+    <tr><td>Trendlyne</td><td>Participant OI day-over-day deltas in one dashboard; insider deals; FII holdings per stock</td></tr>
+    <tr><td>Sensibull</td><td>Live option chain; OI buildup; strategy P&amp;L</td></tr>
+    <tr><td>Opstra (DefinedEdge)</td><td>Option Greeks; IV percentile; multi-leg strategy builder</td></tr>
+    <tr><td>NSEpy / nsetools / jugaad-data</td><td>Python libs that wrap NSE archives — for programmatic ingest into your bot</td></tr>
+  </table>
+
+  <h2>3.8 The evening routine (45 minutes, four nights a week)</h2>
+  <ol>
+    <li><strong>18:00</strong> — open NSE Participant OI for the latest available date. Note net FII / Pro positions in index futures and the change vs previous day.</li>
+    <li><strong>18:05</strong> — refresh FII / DII cash provisional. Note net and 5-day cumulative.</li>
+    <li><strong>18:10</strong> — open today's F&amp;O bhavcopy. Identify max-OI call strike and max-OI put strike for the nearest weekly expiry. These are likely resistance and support.</li>
+    <li><strong>18:20</strong> — compute PCR(OI) for nearest expiry. Note it next to a rolling chart of the last 30 days.</li>
+    <li><strong>18:30</strong> — write three lines in your journal. What changed today. What the data is biased towards. What you'll watch for at the open tomorrow.</li>
+  </ol>
+
+  <div class="exercise">
+    <h4>Exercise — Phase 3</h4>
+    <p>Build a single spreadsheet with columns: <em>Date · FII cash net · DII cash net · FII fut idx long · FII fut idx short · FII fut idx net · Pro fut idx net · Client fut idx net · PCR-OI · Note</em>. Backfill the last 10 trading days manually. Then keep it updated daily for two weeks. By week three you'll start <em>seeing</em> the rhythms.</p>
+  </div>
+
+  <div class="done-check">
+    <h4>Done check</h4>
+    <ul>
+      <li>You can name 5 NSE reports by their menu path.</li>
+      <li>You can list the publishing time of FII/DII cash, Participant OI, and Ban List.</li>
+      <li>You can pull the Participant OI CSV from a direct URL pattern.</li>
+      <li>You've maintained a manual journal for at least 10 trading days.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== PHASE 4 ===================== -->
+<section class="chapter">
+  <div class="chapter-head"><div class="num">PHASE 4</div><h1>Reading the data — the interpretation playbook</h1></div>
+
+  <p>Raw data tells you what happened. Interpretation tells you what to do tomorrow. This chapter is a playbook of recurring patterns and how to act on them.</p>
+
+  <h2>4.1 The seven-question morning checklist</h2>
+  <ol>
+    <li><strong>What did FIIs do in cash yesterday?</strong> Direction, magnitude vs 20-day mean, streak length.</li>
+    <li><strong>What did DIIs do in cash yesterday?</strong> Same. Importantly — were they absorbing FII selling or were both on the same side?</li>
+    <li><strong>What's FII net position in NIFTY futures (latest available)?</strong> Long, short, or neutral? Direction of change vs previous day?</li>
+    <li><strong>What did Pros do in NIFTY futures?</strong> Are they on the same side as FIIs or opposite? Pros vs FIIs divergence is information.</li>
+    <li><strong>Where is the heaviest CE OI sitting?</strong> That strike is likely resistance.</li>
+    <li><strong>Where is the heaviest PE OI sitting?</strong> Likely support.</li>
+    <li><strong>What's the PCR(OI) today vs last week?</strong> Rising PCR = bullish skew building. Falling = bearish.</li>
+  </ol>
+
+  <h2>4.2 Patterns that recur</h2>
+
+  <h3>Pattern A — The classic short squeeze setup</h3>
+  <p>FII net-short index futures sitting at multi-month high. Pros also net-short. CE OI building at strikes just above spot (writers expecting a cap). Then a positive catalyst — global cues, RBI surprise, earnings beat. Shorts unwind violently. NIFTY can gap up 1.5% and trend the whole session.</p>
+  <p>Trade idea: when FII net-short futures &gt; 75th percentile of last 90 days <em>and</em> CE call writers heavy at near-the-money, an ATM CE on a positive global open is high-asymmetry.</p>
+
+  <h3>Pattern B — The slow bleed</h3>
+  <p>FII selling cash for 4+ consecutive days; DII absorbing but with reducing daily amount. PCR(OI) falling steadily, indicating PE writers losing conviction. Pros adding shorts. This is not crash mode — it's a managed decline. Index moves down 0.3–0.7% per session.</p>
+  <p>Trade idea: ATM PE with tight stop, or a bear call spread to harvest theta on writers.</p>
+
+  <h3>Pattern C — The pre-event coil</h3>
+  <p>Major event ahead (RBI MPC, US FOMC, election result, budget). Option IV spikes. Both CE and PE OI build at far OTM strikes (clients buying lottery). Pros write the wings. Spot pinned to max-pain strike. Very narrow daily ranges.</p>
+  <p>Trade idea: short strangle if you have margin discipline; if not, stay flat — directional trades have terrible risk-reward in this regime.</p>
+
+  <h3>Pattern D — The trend day</h3>
+  <p>Pre-open shows large gap (&gt; 0.6%). FII net buyers in pre-market via NIFTY futures on SGX/GIFT. First 15 minutes after open show heavy volume and no retracement. Bank Nifty leading.</p>
+  <p>Trade idea: trend-follow ATM in direction of gap; avoid reversals.</p>
+
+  <h2>4.3 The three traps</h2>
+  <ul>
+    <li><strong>Single-day flow over-reading</strong> — one day of ₹500 cr FII selling means little. Look at 5-day cumulative.</li>
+    <li><strong>Participant OI lag confusion</strong> — Monday's number publishes Tuesday evening; you trade on it Wednesday. Don't act as if it's real-time.</li>
+    <li><strong>PCR worship</strong> — PCR is context, not a trigger. Markets can stay overbought (PCR &gt; 1.5) for weeks.</li>
+  </ul>
+
+  <h2>4.4 Connecting this to your bot</h2>
+  <p>Your current signal engine in <code>signal/node-engine/signalEngine.js</code> scores intraday OI changes per strike to identify BULL or BEAR setups. The next natural extension is to ingest the participant-wise OI file each evening and add a feature: <em>FII-Pro alignment in index futures</em>. When FIIs and Pros are on the same side and both adding, the bot can <em>upweight</em> a same-direction intraday signal. When they're opposite, downweight. We can wire that as a small JS module that reads the CSV from <code>data/fno/participant-oi/</code> and outputs a {-1, 0, +1} bias each morning.</p>
+
+  <div class="done-check">
+    <h4>Done check</h4>
+    <ul>
+      <li>You can walk through the seven-question checklist from memory.</li>
+      <li>You can name and describe at least three recurring patterns.</li>
+      <li>You can articulate why participant data is T+1 and how that constrains how you use it.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== PHASE 5 ===================== -->
+<section class="chapter">
+  <div class="chapter-head"><div class="num">PHASE 5</div><h1>Derivatives Deep Dive</h1></div>
+
+  <p>You can read the tape now. This chapter is where you learn the instruments themselves — futures and options — in enough depth to design strategies rather than borrow them.</p>
+
+  <h2>5.1 Futures</h2>
+  <p>A futures contract is an obligation to buy or sell an underlying at a fixed price on a fixed date. In India, equity index futures (NIFTY, BANKNIFTY, FINNIFTY) are cash-settled at expiry. Each contract has a defined lot size — currently 75 for NIFTY, 30 for BANKNIFTY, 40 for FINNIFTY (subject to NSE revisions).</p>
+
+  <h3>Cost of carry, contango, backwardation</h3>
+  <p>Futures price ≠ spot price. The relationship: <code>F = S × e^((r − d) × t)</code> where r is risk-free rate, d is expected dividend yield, t is time to expiry. In normal conditions futures trade <em>above</em> spot (contango). When demand for shorts spikes (panic, hedging frenzy), futures can trade <em>below</em> spot (backwardation) — a useful sentiment signal.</p>
+
+  <h3>Rollover</h3>
+  <p>On the last Thursday of each month, near-month futures expire. Traders roll positions to the next month. <strong>Rollover percentage</strong> = open interest rolled to next month / total OI in expiring month. Healthy bull rollover &gt; 75% with rising next-month basis indicates conviction. Weak rollover with collapsing basis indicates topping.</p>
+
+  <h2>5.2 Options — first principles</h2>
+  <p>An option is a <em>right, not an obligation</em>. The buyer pays a premium for the right; the seller (writer) collects the premium and accepts the obligation. Two kinds:</p>
+  <ul>
+    <li><strong>Call (CE)</strong> — right to buy at strike. Profitable when underlying rises.</li>
+    <li><strong>Put (PE)</strong> — right to sell at strike. Profitable when underlying falls.</li>
+  </ul>
+
+  <p>Option price = intrinsic value + time value. Intrinsic = max(S−K, 0) for calls, max(K−S, 0) for puts. Time value = whatever's left, and it decays to zero by expiry.</p>
+
+  <h2>5.3 The Greeks</h2>
+  <table>
+    <tr><th>Greek</th><th>What it measures</th><th>Practical takeaway</th></tr>
+    <tr><td>Delta (Δ)</td><td>Change in option price per ₹1 move in underlying</td><td>ATM ≈ 0.5. Deep ITM ≈ 1. Far OTM ≈ 0.</td></tr>
+    <tr><td>Gamma (Γ)</td><td>Change in delta per ₹1 move</td><td>Peaks at ATM. Highest near expiry. Sellers fear gamma.</td></tr>
+    <tr><td>Theta (Θ)</td><td>Daily decay of option price</td><td>Buyers' enemy, sellers' friend. Accelerates near expiry.</td></tr>
+    <tr><td>Vega (ν)</td><td>Change per 1% change in IV</td><td>Long options = long vol. Volatility spike helps buyers.</td></tr>
+    <tr><td>Rho (ρ)</td><td>Change per 1% change in interest rates</td><td>Mostly negligible for short-dated options.</td></tr>
+  </table>
+
+  <h2>5.4 Implied volatility</h2>
+  <p>IV is the market's forward-looking estimate of volatility, backed out of the option price using Black-Scholes. Two derived measures matter:</p>
+  <ul>
+    <li><strong>IV Percentile</strong> — what % of the last 12 months had a lower IV than today's? IVP &gt; 70 means options are historically expensive; favours selling. IVP &lt; 30 means cheap; favours buying.</li>
+    <li><strong>IV Rank</strong> — similar but linear: (current IV − 52w low) / (52w high − 52w low).</li>
+  </ul>
+
+  <h2>5.5 Strategy layering by directional view</h2>
+  <table>
+    <tr><th>View</th><th>Strategy</th><th>Notes</th></tr>
+    <tr><td>Strongly bullish</td><td>Long call (ATM/ITM)</td><td>Defined risk; unlimited upside</td></tr>
+    <tr><td>Moderately bullish</td><td>Bull call spread</td><td>Cheaper, capped upside</td></tr>
+    <tr><td>Mildly bullish, want income</td><td>Bull put spread</td><td>Credit; benefits from theta</td></tr>
+    <tr><td>Neutral, low vol</td><td>Iron condor</td><td>Sells volatility; defined risk</td></tr>
+    <tr><td>Neutral, high vol expected</td><td>Long straddle / strangle</td><td>Long gamma + vega</td></tr>
+    <tr><td>Mildly bearish, want income</td><td>Bear call spread</td><td>Credit</td></tr>
+    <tr><td>Moderately bearish</td><td>Bear put spread</td><td>Defined</td></tr>
+    <tr><td>Strongly bearish</td><td>Long put</td><td>Or short futures with stop</td></tr>
+  </table>
+
+  <h2>5.6 Expiry-day mechanics</h2>
+  <p>Each weekly expiry day (NIFTY: Thursday by current SEBI rules) has its own physics:</p>
+  <ul>
+    <li>Theta is highest — OTM options bleed through the morning.</li>
+    <li>Pin risk — index gravitates toward max-pain strike as writers defend it.</li>
+    <li>Gamma spikes for ATM — small moves cause large premium swings.</li>
+    <li>The 0DTE trade — buying OTM 1-2 hours before close hoping for a tail move. Lottery; mostly loses; occasionally 10x. Plan size accordingly.</li>
+  </ul>
+
+  <h2>5.7 Suggested reading order</h2>
+  <ol>
+    <li>Zerodha Varsity Module 5 (Futures) — free.</li>
+    <li>Zerodha Varsity Module 6 (Options) — free, very practical.</li>
+    <li>Sheldon Natenberg, <em>Option Volatility &amp; Pricing</em> — once comfortable. Single best book on options.</li>
+    <li>Euan Sinclair, <em>Volatility Trading</em> — when you want to model IV yourself.</li>
+  </ol>
+
+  <div class="done-check">
+    <h4>Done check</h4>
+    <ul>
+      <li>You can explain delta, gamma, theta, vega in one sentence each.</li>
+      <li>You can sketch payoff diagrams for: long call, short put, bull call spread, iron condor.</li>
+      <li>You know what an "IV percentile" tells you and how to act on extremes.</li>
+      <li>You understand why short gamma near expiry is the most dangerous position retail typically takes accidentally.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== PHASE 6 — SMC ===================== -->
+<section class="chapter">
+  <div class="chapter-head"><div class="num">PHASE 6</div><h1>Smart Money Concepts (SMC)</h1></div>
+
+  <p>SMC is a price-action framework built on one premise: <em>the market moves to take liquidity, not to be fair</em>. Institutions — FIIs, banks, prop desks — need to fill orders far too large to be absorbed at a single price. They engineer moves that bait retail into the wrong side, then trade against the very flow they baited. SMC is the toolkit for reading those footprints on a chart.</p>
+
+  <p>This chapter is taught zero to advanced. By the end you will be able to mark up a NIFTY chart with order blocks, liquidity pools, BOS, CHoCH, and entries — and combine that with the participant-OI work from Phase 2–3 for a complete picture of <em>who</em> is doing it and <em>where</em>.</p>
+
+  <h2>6.1 The premise — why SMC works</h2>
+  <ul>
+    <li>Retail places stops at obvious places: just below the previous swing low, just above the previous swing high, under round numbers, below the prior day's low.</li>
+    <li>These cluster into <em>liquidity pools</em> — pockets of resting orders that smart money can fill against.</li>
+    <li>Big orders cannot fill silently. To buy a thousand contracts, an institution needs a thousand sellers — and the cheapest way to get sellers is to scare retail into selling. (And vice versa for distribution.)</li>
+    <li>So the market is engineered through three repeating phases — accumulation, manipulation, distribution — that show up fractally on every timeframe.</li>
+  </ul>
+
+  <h2>6.2 PO3 — the Power of Three (the daily script)</h2>
+  <p>Every quality trading session repeats this three-act play:</p>
+  <table>
+    <tr><th>Phase</th><th>What price does</th><th>What retail thinks</th><th>What smart money is doing</th></tr>
+    <tr><td>1. Accumulation</td><td>Sideways range, low volatility</td><td>"Boring, nothing happening"</td><td>Quietly loading positions inside the range</td></tr>
+    <tr><td>2. Manipulation</td><td>Sharp fake breakout in the <em>opposite</em> direction of the real move</td><td>"Breakout! Chase!"</td><td>Running retail stops, filling remaining orders</td></tr>
+    <tr><td>3. Distribution</td><td>Real trend in the original (smart-money) direction</td><td>"Wait, why is it going the other way?"</td><td>Selling into retail buying (or buying retail selling)</td></tr>
+  </table>
+
+  <p>Mapped to a typical NIFTY intraday session:</p>
+  <ul>
+    <li><strong>09:15 – 09:30</strong> — first 15-minute range. This is often the day's accumulation zone.</li>
+    <li><strong>09:30 – 10:00</strong> — manipulation window. Price often pokes above or below the opening range to grab stops.</li>
+    <li><strong>10:00 – 14:00</strong> — distribution / real trend. Most clean trends print here.</li>
+    <li><strong>14:00 – 15:30</strong> — pre-close drift, hedging flow, often counter-trend retracements.</li>
+  </ul>
+
+  <h2>6.3 Market structure — BOS and CHoCH</h2>
+
+  <p>Market structure is the sequence of swing highs and swing lows that defines the trend.</p>
+
+  <h3>Uptrend</h3>
+  <p>Higher highs (HH) and higher lows (HL). Pattern: HL → HH → HL → HH …</p>
+
+  <h3>Downtrend</h3>
+  <p>Lower lows (LL) and lower highs (LH). Pattern: LH → LL → LH → LL …</p>
+
+  <h3>BOS (Break of Structure)</h3>
+  <p><strong>Continuation.</strong> In an uptrend, when price breaks the last HH, that's a bullish BOS — the trend continues. In a downtrend, breaking the last LL is a bearish BOS.</p>
+
+  <h3>CHoCH (Change of Character)</h3>
+  <p><strong>First sign of reversal.</strong> In an uptrend, when price breaks the most recent HL (not the HH), that's a bullish-to-bearish CHoCH. The character of the market has changed — buyers can no longer defend the last pullback. CHoCH is the earliest reliable reversal signal in SMC.</p>
+
+  <div class="callout">
+    <div class="label">RULE OF THUMB</div>
+    BOS = continuation. CHoCH = reversal alarm. After a CHoCH, you stop looking for buys (in a topping market) and start hunting sells — but only after a pullback into a fresh bearish order block.
+  </div>
+
+  <h2>6.4 Liquidity — where stops live</h2>
+
+  <p>Liquidity is the fuel. Mark these levels on every chart:</p>
+  <ul>
+    <li><strong>BSL (buy-side liquidity)</strong> — resting orders <em>above</em> the market. Sit above swing highs, above equal highs, above PDH (previous day high), above weekly high. When price wicks through, smart money is taking BSL.</li>
+    <li><strong>SSL (sell-side liquidity)</strong> — resting orders <em>below</em> the market. Below swing lows, equal lows, PDL, weekly low.</li>
+    <li><strong>Equal highs / equal lows</strong> — magnets. Retail draws horizontal resistance/support; smart money sees a pool to drain.</li>
+    <li><strong>Trendline liquidity</strong> — when retail draws a trendline, stops cluster on the wrong side of it. Smart money breaks the trendline to grab them.</li>
+    <li><strong>PDH / PDL / IBH / IBL</strong> — previous day high/low, initial balance (first hour) high/low.</li>
+    <li><strong>GIFT NIFTY overnight high / low</strong> — the Indian "Asian range." Often swept at the cash open.</li>
+  </ul>
+
+  <h2>6.5 Order Blocks (OB)</h2>
+
+  <p>An order block is the last opposite-direction candle <em>before</em> an impulsive move. Mechanically: it's where institutions placed the orders that caused the impulse, so when price comes back to that zone they often defend it.</p>
+
+  <ul>
+    <li><strong>Bullish OB</strong> — the last bearish (red) candle before a strong up-move. Mark its body or full range. Look for buys when price returns to it.</li>
+    <li><strong>Bearish OB</strong> — the last bullish (green) candle before a strong down-move. Look for sells when price returns to it.</li>
+    <li><strong>Mitigation</strong> — the act of price returning to test the OB. Most plays happen on the first mitigation; subsequent mitigations are weaker.</li>
+    <li><strong>Breaker block</strong> — an OB that failed (price broke through it). The role flips: a failed bullish OB becomes a bearish breaker on retest.</li>
+  </ul>
+
+  <h2>6.6 Fair Value Gaps (FVG / Imbalance)</h2>
+
+  <p>A 3-candle pattern. Candle 1 high and candle 3 low (in a bullish move) don't overlap — the middle candle leaves a gap of unfilled price. The market treats this as unfinished business and tends to come back to fill it.</p>
+  <ul>
+    <li>FVGs near recent structure are more reliable than FVGs deep in a trend.</li>
+    <li>An FVG that overlaps an OB is a high-confluence zone — many SMC traders only take trades at OB + FVG overlap.</li>
+  </ul>
+
+  <h2>6.7 Premium &amp; Discount</h2>
+
+  <p>For any impulse leg you're working with, find the 50% midpoint.</p>
+  <ul>
+    <li>Price above 50% = <strong>premium</strong> → favours selling.</li>
+    <li>Price below 50% = <strong>discount</strong> → favours buying.</li>
+    <li>The 50% line itself is "equilibrium" — institutions often defend it.</li>
+  </ul>
+  <p>Combined with structure: in an uptrend, buy only at <em>discount</em> of the latest bullish leg. Don't chase price at premium.</p>
+
+  <h2>6.8 Inducement — the trap before the trap</h2>
+
+  <p>Inducement is a small fake structure designed to bait retail <em>before</em> the real liquidity sweep. Example:</p>
+  <ol>
+    <li>NIFTY has a clean uptrend, with an obvious HL at 22,400.</li>
+    <li>Smart money prints a small lower-low at 22,395 — looks like a bearish break, retail shorts.</li>
+    <li>Price snaps back up, takes out the original HL stops at 22,400 (those shorts now stop out), and continues to the next BSL at 22,550.</li>
+  </ol>
+  <p>The 22,395 dip was inducement. The 22,400 sweep was the actual liquidity grab. SMC traders learn to wait for the <em>second</em> move — the sweep of the obvious level — not the first.</p>
+
+  <h2>6.9 SMT divergence</h2>
+
+  <p>Two correlated instruments should move together. When one makes a new high or new low and its sibling doesn't, the new extreme is suspect. Examples in Indian markets:</p>
+  <ul>
+    <li><strong>NIFTY vs BANKNIFTY</strong> — NIFTY prints HH but BANKNIFTY only prints LH → bearish SMT, NIFTY top is likely false.</li>
+    <li><strong>NIFTY vs GIFT NIFTY</strong> — intraday divergence between cash NIFTY and the futures listed on NSE IFSC.</li>
+    <li><strong>NIFTY vs DOW / S&amp;P</strong> — overnight session: if S&amp;P closes at new highs but GIFT NIFTY doesn't follow, expect Indian weakness at open.</li>
+  </ul>
+
+  <h2>6.10 The "opposite people dump" mechanic — explicitly</h2>
+
+  <p>This is the single most useful SMC idea once you've already built the participant-OI habit from Phase 3.</p>
+
+  <p>Smart money cannot fill a large position at a single price — they need a counterparty for every contract. So:</p>
+  <ul>
+    <li>When they want to <strong>distribute</strong> (sell from inventory), they first <em>induce retail to buy</em>: engineer a breakout above an obvious resistance to trigger retail CE buying and breakout chasing. They sell into that demand. Once the supply is offloaded, price reverses and the retail CEs become worthless.</li>
+    <li>When they want to <strong>accumulate</strong> (buy into inventory), they first <em>induce retail to sell</em>: engineer a fake break below support to trigger panic and retail PE buying. They buy from the panic sellers. Then price reverses up.</li>
+  </ul>
+
+  <p>Mathematically: retail aggregate position is roughly the <em>inverse</em> of smart money's intended fill. When you see Client OI heavily net-long index futures while FIIs and Pros are net-short — that's a distribution-loaded setup. The dump is being prepared.</p>
+
+  <div class="callout">
+    <div class="label">CONNECTING SMC TO YOUR BOT</div>
+    Your bot already computes intraday OI buildup at each strike. Add this layer: when Client = net long &amp; FII + Pro = net short on the most recent participant-OI file, treat the day as a distribution-bias day. The bot should be quicker to short CE rallies and slower to chase CE breakouts.
+  </div>
+
+  <h2>6.11 Worked examples (NIFTY)</h2>
+
+  <h3>Example A — Bullish reversal off PDL sweep</h3>
+  <ol>
+    <li>Previous day's low (PDL) = 22,380. Mark it on the chart.</li>
+    <li>Today's session opens 22,420 and drifts down through morning.</li>
+    <li>At 10:45 NIFTY spikes to 22,365 — wicks below PDL by 15 points, then closes the 5-min candle back at 22,395. <em>SSL grabbed.</em></li>
+    <li>The very next 5-min candle prints a strong bullish engulfing closing at 22,440 — that's a CHoCH on 5-min (previous lower-high at 22,430 broken).</li>
+    <li>Find the order block: the last bullish candle that pushed up to 22,430 — say it was the 09:55 candle, range 22,408–22,425. That's your bullish OB.</li>
+    <li>Enter long when price retraces to 22,420 (inside the OB). Stop just below the sweep low (22,360). Target the day's BSL at 22,510 (previous day high cluster).</li>
+    <li>Reward/risk ≈ 90 / 60 = 1.5×, scaled up by the high-probability setup.</li>
+  </ol>
+
+  <h3>Example B — Bearish dump after BSL sweep at equal highs</h3>
+  <ol>
+    <li>NIFTY ranges between 22,500 and 22,560 for two days. Equal highs at 22,560 are obvious.</li>
+    <li>Participant OI from previous evening: Client +1.8 lakh long contracts on index futures; FII −1.5 lakh net. <em>Distribution setup loaded.</em></li>
+    <li>At 11:20 NIFTY breaks 22,560, prints 22,578, and pulls back to 22,555 within 10 minutes. <em>BSL grabbed; CHoCH on 5-min.</em></li>
+    <li>The OB is the last bearish 5-min candle before the spike — say 22,553–22,565.</li>
+    <li>Short on retest of OB around 22,560. Stop above 22,585. Target previous range low at 22,500, then PDL at 22,460.</li>
+    <li>Retail CE buyers who chased the 22,560 breakout are now underwater; their stops at 22,545 add fuel to the dump.</li>
+  </ol>
+
+  <h3>Example C — Inducement trap on a clean trendline</h3>
+  <ol>
+    <li>BANKNIFTY in clean uptrend, four HLs forming a visible trendline.</li>
+    <li>Price breaks the trendline at 48,200 — retail shorts on the "breakdown." This is inducement.</li>
+    <li>Price wicks down to 48,150, sweeping SSL below the previous HL at 48,170. Then snaps up to 48,300, stopping all the breakout shorts.</li>
+    <li>BOS bullish above 48,300 confirms continuation; trend resumes to next BSL at 48,600.</li>
+    <li>Lesson: trendline breaks are the <em>most common</em> retail trap. Wait for the sweep and CHoCH, not the break.</li>
+  </ol>
+
+  <h3>Example D — SMT divergence reversal</h3>
+  <ol>
+    <li>Late session 14:30. NIFTY pushes to a new intraday high at 22,490. BANKNIFTY at the same minute fails to break its own intraday high — prints a lower high.</li>
+    <li>That's a bearish SMT — NIFTY's high is unconfirmed.</li>
+    <li>Within 15 minutes NIFTY rejects, prints a CHoCH on 5-min, and closes the session at 22,420.</li>
+    <li>The setup is especially clean near the close because intraday participants are squaring off — gives less follow-through risk.</li>
+  </ol>
+
+  <h2>6.12 Timeframe hierarchy</h2>
+  <p>SMC works on every timeframe but only the right way: <em>bias from higher timeframe (HTF), entry on lower timeframe (LTF)</em>.</p>
+  <table>
+    <tr><th>Timeframe</th><th>What you read from it</th></tr>
+    <tr><td>Weekly</td><td>Major liquidity (multi-week swing H/L), macro structure</td></tr>
+    <tr><td>Daily</td><td>Bias for the day, PDH/PDL, daily OBs</td></tr>
+    <tr><td>1-hour</td><td>Intraday structure, HTF order blocks worth watching</td></tr>
+    <tr><td>15-min</td><td>Confirm CHoCH/BOS, locate refined OB</td></tr>
+    <tr><td>5-min / 1-min</td><td>Execution: entry candle, stop placement</td></tr>
+  </table>
+
+  <h2>6.13 Common mistakes</h2>
+  <ul>
+    <li><strong>Marking every wick as a "sweep."</strong> A real sweep is a wick that clearly takes out an obvious level and immediately reverses with momentum — not every minor poke.</li>
+    <li><strong>Too many order blocks.</strong> Only the most recent untested OB at the relevant structural level matters. Erase the rest.</li>
+    <li><strong>Ignoring HTF.</strong> A perfect 5-min bullish setup that sits inside a daily bearish OB will fail. Always check HTF first.</li>
+    <li><strong>Trading without confluence.</strong> One signal alone (just a CHoCH, just an OB) is weak. Three confluences (CHoCH + OB + discount + SMT) is a high-probability trade.</li>
+    <li><strong>Using SMC without participant data.</strong> SMC tells you <em>where</em>; OI / FII-Pro positioning tells you <em>whether</em>. Use both.</li>
+  </ul>
+
+  <h2>6.14 A clean SMC checklist for NIFTY intraday</h2>
+  <ol>
+    <li>Before 09:15 — mark PDH, PDL, weekly H/L, GIFT NIFTY overnight H/L on chart.</li>
+    <li>Check participant OI from previous evening — note bias (Client vs FII+Pro).</li>
+    <li>Watch first 15 minutes; mark the opening range high/low.</li>
+    <li>Wait for the first liquidity sweep of an obvious level (PDH/PDL/OR-high/OR-low).</li>
+    <li>Confirm CHoCH on 5-min in the opposite direction of the sweep.</li>
+    <li>Identify the OB or FVG that caused the CHoCH leg.</li>
+    <li>Enter on retest of the OB; stop beyond the sweep wick.</li>
+    <li>Target the opposite side's liquidity pool.</li>
+    <li>Move stop to entry after 1R; trail or scale out at major levels.</li>
+  </ol>
+
+  <div class="exercise">
+    <h4>Exercise — Phase 6</h4>
+    <ol>
+      <li>Open last week's NIFTY 5-min chart for any one day. Mark PDH, PDL, opening range, swing highs &amp; lows.</li>
+      <li>Identify every liquidity sweep (wick through a level followed by close back inside) in that session.</li>
+      <li>For each sweep, did a CHoCH follow on 5-min within the next 6 candles? If yes, mark the order block and the would-be trade.</li>
+      <li>Note R-multiple of each setup using a stop just beyond the sweep wick.</li>
+      <li>Cross-reference: was the participant-OI bias from the previous evening on the same side as your winning setups?</li>
+    </ol>
+  </div>
+
+  <div class="done-check">
+    <h4>Done check</h4>
+    <ul>
+      <li>You can define BOS, CHoCH, OB, FVG, BSL, SSL, inducement, SMT in your own words.</li>
+      <li>You can mark up a chart with structure and identify the latest valid OB.</li>
+      <li>You can describe the "opposite people dump" cycle and tie it to a participant-OI configuration.</li>
+      <li>You've walked through at least one historical NIFTY session bar-by-bar with the full checklist.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== PHASE 7 ===================== -->
+<section class="chapter">
+  <div class="chapter-head"><div class="num">PHASE 7</div><h1>Advanced &amp; Quantitative</h1></div>
+
+  <p>Once derivatives are second nature, the next layer is microstructure, volatility surfaces, macro overlays, and quantitative process. This chapter is shorter on prescription and longer on signposts — each topic is its own multi-month rabbit hole.</p>
+
+  <h2>6.1 Market microstructure</h2>
+  <ul>
+    <li><strong>Order book dynamics</strong> — limit orders form depth; market orders consume it. Bid-ask spread is the cost of immediacy.</li>
+    <li><strong>Market makers</strong> — quote both sides; profit on spread; hedge inventory with futures.</li>
+    <li><strong>HFT &amp; latency arbitrage</strong> — sub-millisecond strategies; not your game, but understand they exist.</li>
+    <li><strong>Iceberg orders</strong> — large orders shown in small visible slices.</li>
+  </ul>
+
+  <h2>6.2 Volatility surface</h2>
+  <p>For a given expiry, plot IV across strikes — you don't get a flat line; you get a <em>smile</em> or <em>skew</em>. Indian index options typically show a put skew (OTM puts more expensive than equivalent OTM calls) because the market pays up for crash protection. The shape of the skew is itself tradeable.</p>
+  <p>Then layer expiry on the X-axis — that's the <em>term structure</em>. Normal: longer-dated options have higher IV. Inverted (front-month higher): event imminent, expected volatility front-loaded.</p>
+
+  <h2>6.3 Macro overlay</h2>
+  <table>
+    <tr><th>Variable</th><th>Direction of impact</th></tr>
+    <tr><td>DXY (Dollar Index) up</td><td>Negative for EMs incl. India; FIIs sell</td></tr>
+    <tr><td>US 10Y yield up</td><td>Equity risk premium compresses; growth stocks hit hardest</td></tr>
+    <tr><td>Crude oil up</td><td>Negative for India (net importer); current account deteriorates</td></tr>
+    <tr><td>VIX (India VIX) up</td><td>Risk-off; option IV expands</td></tr>
+    <tr><td>SGX / GIFT NIFTY pre-open</td><td>Best leading indicator for India open at 09:15</td></tr>
+    <tr><td>FOMC / RBI MPC days</td><td>IV crush after announcement — beware of long-vol positions</td></tr>
+  </table>
+
+  <h2>6.4 Quantitative process</h2>
+  <p>Your bot is already in this territory. The disciplines you'll grow into:</p>
+  <ul>
+    <li><strong>Backtesting</strong> — walk-forward, never look-ahead bias, account for slippage and costs. Your <code>paperTrader.js</code> + diagnostics CSV are exactly this in live form.</li>
+    <li><strong>Position sizing</strong> — fixed fractional, Kelly criterion (½-Kelly is a sane practical version), volatility-adjusted.</li>
+    <li><strong>Risk metrics</strong> — Sharpe (return/total vol), Sortino (return/downside vol), max drawdown, Calmar (return/max DD).</li>
+    <li><strong>Regime detection</strong> — trend vs mean-reversion; high vol vs low vol. Strategies that print in one regime lose in the other.</li>
+    <li><strong>Risk of ruin</strong> — at your edge and sizing, what's the probability of losing X% before recovering? Don't trade until you can answer this.</li>
+  </ul>
+
+  <h2>6.5 Where this connects back to your bot</h2>
+  <p>Concretely, three additions you'll likely want over the next 90 days:</p>
+  <ol>
+    <li><strong>Daily participant OI ingest</strong> — fetch the CSV at 18:30 IST; store in <code>data/fno/participant-oi/</code>; expose a {-1, 0, +1} bias feature to <code>signalEngine.js</code>.</li>
+    <li><strong>IV regime gate</strong> — pull India VIX; refuse to open new long-premium trades when VIX &gt; 75th percentile of last 90 days.</li>
+    <li><strong>Macro pre-open check</strong> — read GIFT NIFTY at 09:00 IST; skip the session if gap is &gt; 1% (trend day, your mean-reversion edge breaks down).</li>
+  </ol>
+
+  <div class="done-check">
+    <h4>Done check</h4>
+    <ul>
+      <li>You can describe the volatility smile and why Indian indices skew toward puts.</li>
+      <li>You can name three macro variables and their direction of impact on NIFTY.</li>
+      <li>You can explain Sharpe ratio, drawdown, and Kelly sizing in your own words.</li>
+      <li>You've designed at least one bot improvement informed by participant data.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== APPENDIX A ===================== -->
+<section class="chapter">
+  <div class="chapter-head"><div class="num">APPENDIX A</div><h1>The 90-day plan</h1></div>
+
+  <table>
+    <tr><th>Week</th><th>Focus</th><th>Deliverable</th></tr>
+    <tr><td>1</td><td>Phase 0 — Foundations</td><td>Cost-stack worksheet for one of your own trades</td></tr>
+    <tr><td>2</td><td>Phase 1 — Market structure</td><td>Read NSE bhavcopy unaided; answer the 5 done-check questions</td></tr>
+    <tr><td>3</td><td>Phase 2 — Participants</td><td>Pull last 10 days of participant-OI; tabulate net positions per bucket</td></tr>
+    <tr><td>4</td><td>Phase 3 — Data sources</td><td>Manual evening journal running for 10 trading days</td></tr>
+    <tr><td>5</td><td>Phase 4 — Interpretation</td><td>Write 3 trade ideas based on patterns from real recent data</td></tr>
+    <tr><td>6–7</td><td>Phase 5 — Derivatives</td><td>Paper-trade options on the bot, one strategy per week, logged with thesis</td></tr>
+    <tr><td>8</td><td>Phase 5 cont.</td><td>Implement one credit spread strategy end-to-end with rules</td></tr>
+    <tr><td>9</td><td>Phase 6 — SMC fundamentals</td><td>Mark up 10 NIFTY sessions: structure, OB, FVG, sweeps</td></tr>
+    <tr><td>10</td><td>Phase 6 — SMC playbook</td><td>Paper-trade SMC checklist for 10 sessions; log R-multiples</td></tr>
+    <tr><td>11</td><td>Phase 7 — Microstructure, macro &amp; quant</td><td>Add VIX feature, GIFT NIFTY check, participant-OI ingest</td></tr>
+    <tr><td>12</td><td>Backtesting &amp; synthesis</td><td>Run 6-month walk-forward; write your own one-page playbook</td></tr>
+  </table>
+
+  <p>A few rules:</p>
+  <ul>
+    <li>Maintain a daily journal — three lines minimum. Markets reward patience; journals create patience.</li>
+    <li>Don't move to the next phase until that phase's done-check questions are second nature.</li>
+    <li>Resist the temptation to skip ahead to strategy. Knowing one strategy thoroughly beats six strategies superficially.</li>
+  </ul>
+</section>
+
+<!-- ===================== APPENDIX B ===================== -->
+<section class="chapter">
+  <div class="chapter-head"><div class="num">APPENDIX B</div><h1>Glossary</h1></div>
+
+  <p><strong>AMO</strong> — After-Market Order; queued for next session.</p>
+  <p><strong>Accumulation</strong> — Phase 1 of PO3: institutions quietly build position in a range.</p>
+  <p><strong>ASM</strong> — Additional Surveillance Measure; stages I–IV.</p>
+  <p><strong>BOS</strong> — Break of Structure; trend continuation signal.</p>
+  <p><strong>Breaker block</strong> — A failed order block; role-flipped on retest.</p>
+  <p><strong>BSL</strong> — Buy-Side Liquidity; stops resting above swing highs.</p>
+  <p><strong>ATM</strong> — At-the-money; option strike nearest to current spot.</p>
+  <p><strong>Bhavcopy</strong> — Daily end-of-day CSV published by NSE/BSE with OHLC, volume and OI.</p>
+  <p><strong>Block deal</strong> — A trade ≥ ₹10 cr executed in the dedicated block window.</p>
+  <p><strong>Bulk deal</strong> — A cumulative single-day trade &gt; 0.5% of company's listed shares.</p>
+  <p><strong>CE / PE</strong> — Call European / Put European (Indian listed index options are European-style).</p>
+  <p><strong>CHoCH</strong> — Change of Character; first sign of trend reversal in SMC.</p>
+  <p><strong>Client</strong> — NSE participant code for retail + HNI.</p>
+  <p><strong>CNC</strong> — Cash &amp; Carry; delivery-based equity buy.</p>
+  <p><strong>Delta</strong> — Sensitivity of option price to ₹1 underlying move.</p>
+  <p><strong>DII</strong> — Domestic Institutional Investor.</p>
+  <p><strong>Distribution</strong> — Phase 3 of PO3: real trend in smart-money direction after retail is trapped.</p>
+  <p><strong>F&amp;O ban</strong> — Stocks with market-wide OI &gt; 95% of limit; only position-reducing trades next day.</p>
+  <p><strong>FVG</strong> — Fair Value Gap; 3-candle imbalance that price tends to revisit.</p>
+  <p><strong>FII / FPI</strong> — Foreign Portfolio Investor.</p>
+  <p><strong>Gamma</strong> — Rate of change of delta; risk indicator for sellers.</p>
+  <p><strong>GIFT NIFTY</strong> — NIFTY futures listed on NSE IFSC, GIFT City; trades almost 24×6 and is the leading indicator pre-open.</p>
+  <p><strong>GSM</strong> — Graded Surveillance Measure; stages 0–IV.</p>
+  <p><strong>GTT</strong> — Good-Till-Triggered; broker-side resting trigger.</p>
+  <p><strong>HNI</strong> — High Net-worth Individual.</p>
+  <p><strong>Inducement</strong> — A small fake structure designed to bait retail before the real liquidity sweep.</p>
+  <p><strong>ITM / ATM / OTM</strong> — In-, At-, Out-of-the-money.</p>
+  <p><strong>IV</strong> — Implied Volatility; market's forward vol estimate.</p>
+  <p><strong>Liquidity sweep</strong> — Quick wick through an obvious swing level to take stops, followed by reversal.</p>
+  <p><strong>Lot size</strong> — Minimum tradable F&amp;O quantity; e.g. NIFTY currently 75.</p>
+  <p><strong>Manipulation</strong> — Phase 2 of PO3: fake breakout designed to trigger retail stops the wrong way.</p>
+  <p><strong>Max pain</strong> — Strike at which option writers collectively lose the least if held to expiry.</p>
+  <p><strong>Mitigation</strong> — Price returning to test (and react at) a previous order block.</p>
+  <p><strong>MIS</strong> — Margin Intraday Square-off; intraday product code.</p>
+  <p><strong>MTM</strong> — Mark-to-Market; daily P&amp;L settlement for futures.</p>
+  <p><strong>NRML</strong> — Normal; overnight F&amp;O product code.</p>
+  <p><strong>OB</strong> — Order Block; last opposite-color candle before an impulsive move; institutional footprint.</p>
+  <p><strong>OI</strong> — Open Interest; total outstanding contracts.</p>
+  <p><strong>PCR</strong> — Put-Call Ratio; sum(PE OI) / sum(CE OI).</p>
+  <p><strong>PDH / PDL</strong> — Previous Day High / Previous Day Low. Magnet levels for liquidity.</p>
+  <p><strong>PO3</strong> — Power of Three; accumulation → manipulation → distribution cycle.</p>
+  <p><strong>Premium / Discount</strong> — Above / below the 50% midpoint of an impulse leg. Sell premium, buy discount.</p>
+  <p><strong>Pro</strong> — Proprietary trader; broker trading its own book.</p>
+  <p><strong>Rollover</strong> — Carrying a futures position from expiring month to next.</p>
+  <p><strong>SAST</strong> — Substantial Acquisition of Shares and Takeovers; SEBI disclosure regime.</p>
+  <p><strong>SEBI</strong> — Securities and Exchange Board of India; market regulator.</p>
+  <p><strong>SGX NIFTY</strong> — Predecessor to GIFT NIFTY (migrated to NSE IFSC mid-2023).</p>
+  <p><strong>SMC</strong> — Smart Money Concepts; price-action framework around liquidity, order blocks, and structure.</p>
+  <p><strong>SMT divergence</strong> — Smart Money Technique divergence; correlated assets failing to confirm each other's extremes.</p>
+  <p><strong>SSL</strong> — Sell-Side Liquidity; stops resting below swing lows.</p>
+  <p><strong>SL / SL-M</strong> — Stop-loss limit / market.</p>
+  <p><strong>STT</strong> — Securities Transaction Tax.</p>
+  <p><strong>T+1</strong> — Settlement cycle: trade today, settle one business day later.</p>
+  <p><strong>T2T</strong> — Trade-to-trade; intraday squaring not allowed.</p>
+  <p><strong>Theta</strong> — Daily option time decay.</p>
+  <p><strong>Vega</strong> — Sensitivity of option price to IV.</p>
+  <p><strong>VIX</strong> — India VIX; NSE's volatility index derived from NIFTY options.</p>
+</section>
+
+</body>
+</html>

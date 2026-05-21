@@ -1,0 +1,93 @@
+Phase 0 — Foundations (1–2 weeks)
+What to learn
+
+What a share is, primary vs secondary market, IPOs, demat/trading account flow.
+Exchanges: NSE, BSE. Indices: NIFTY 50, BANK NIFTY, SENSEX, FINNIFTY, MIDCPNIFTY.
+Regulators: SEBI (market regulator), RBI (monetary), MoF (fiscal). Why each matters.
+Order types: market, limit, SL, SL-M, GTT. Settlement cycle (T+1 in India).
+Sources
+
+NSE Academy free modules (NCFM "Capital Market Module" is gold for basics).
+Zerodha Varsity → Module 1 ("Introduction to Stock Markets").
+Done when you can explain trade-to-settlement in one paragraph without help.
+
+Phase 1 — Market Structure & Segments (1 week)
+Cash (equity delivery), intraday (MIS), F&O (futures + options), currency, commodity (MCX).
+Trading session: pre-open 09:00–09:15, normal 09:15–15:30, post-close 15:40–16:00.
+Circuit limits, surveillance (ASM/GSM lists), corporate actions (splits, bonus, dividend, F&O ban list).
+Done when you can read NSE's daily bhavcopy and explain each column.
+
+Phase 2 — Market Participants (the FII / DII / Pro layer)
+This is where your real question lives. NSE classifies F&O participants into four buckets and publishes their data:
+
+Code	Meaning	Who they are
+Client	Retail + HNI	Individuals, HUFs, small firms
+DII	Domestic Institutional Investors	Indian MFs, insurance (LIC), banks, pension funds
+FII / FPI	Foreign Portfolio Investors	Foreign funds, hedge funds, sovereign wealth
+Pro	Proprietary traders	Broker's own desk trading own capital (Zerodha prop, etc.)
+Why each matters
+
+FIIs drive trend — large flows move NIFTY heavily; their index futures positioning is widely tracked.
+DIIs are usually counter-cyclical providers of liquidity; SIP inflows give a steady bid.
+Pros are often short-dated and tactical — their options OI shifts can signal hedging/positioning.
+Clients are mostly net option-buyers; their positioning is often a contra-indicator.
+Done when you can describe a "FII sells cash + Pros sell index futures" tape without looking it up.
+
+Phase 3 — Where the data comes from, end-of-day (this is what you asked)
+After market close, here is the exact sequence of releases:
+
+3.1 Cash-market FII/DII (≈ 17:30–18:30 IST, provisional; final by next morning)
+NSE: nseindia.com → Reports → FII / DII Reports → "FII / DII Trading Activity" — provisional net buy/sell in cash market.
+BSE: parallel page on bseindia.com.
+Aggregator with history: moneycontrol.com → Markets → FII-DII Activity.
+Telegram/X feeds repost the numbers within seconds — fine for speed, but verify against NSE.
+3.2 F&O Participant-wise Open Interest (around 18:00–19:00 IST, for previous trading day)
+This is the big one for derivatives traders.
+
+NSE: nseindia.com → Reports → Derivatives → Participant Wise Open Interest (CSV).
+Columns: Client / DII / FII / Pro × Long / Short × (Index Futures, Stock Futures, Index Call Options, Index Put Options, Stock Options).
+Important nuance: this file is T+1 — Monday's data is published Tuesday evening. NSE explicitly delays it to prevent front-running.
+3.3 F&O Participant-wise Volume (same page, next-day)
+Useful to see who traded how much, not just net position.
+3.4 Bulk & Block Deals (≈ 18:00 IST, same day)
+nseindia.com → Reports → Equities → Bulk Deals / Block Deals.
+Shows specific FII/MF names entering/exiting individual stocks.
+3.5 SAST / Insider trading disclosures (rolling, end of day)
+BSE/NSE corporate filings; tells you when promoters/insiders buy or sell.
+3.6 Aggregators that pre-chew the data
+Trendlyne — Participant OI dashboard with day-over-day deltas.
+Sensibull / Opstra — option-chain analytics, OI buildup, PCR.
+NSEpy / nsetools / jugaad-data (Python) — programmatic pull of all the above.
+Done when you can pull yesterday's Participant OI CSV, compute net long/short per category, and spot if FIIs flipped from long to short on index futures.
+
+Phase 4 — Reading the data (interpretation)
+A standard end-of-day routine:
+
+Cash market net flow — FII –1,200cr / DII +900cr → net institutional outflow ~300cr.
+FII index futures net position — long/short ratio. A drop from 60% long to 40% long over a week is a positioning shift, not noise.
+FII index options — call writing vs put writing tells you which side they're defending.
+Pro positioning — pros often lead institutional flows by 1–2 sessions.
+Client OI — usually opposite of Pros; widening gap = stronger signal.
+PCR (Put-Call Ratio) of OI for nearest expiry — context, not a trigger.
+Max Pain & key OI walls — heaviest CE/PE OI strikes act as magnets/resistance.
+Build this as a daily checklist before you place a trade the next day.
+
+Phase 5 — Derivatives Deep Dive (4–6 weeks)
+Futures: contango/backwardation, basis, rollover %, cost of carry.
+Options: intrinsic vs time value; IV; Greeks (Delta, Gamma, Theta, Vega, Rho).
+Strategies layered by directional view: long call/put → spreads → straddles/strangles → iron condor/butterfly → calendars/diagonals.
+Expiry mechanics: weekly NIFTY/BANKNIFTY/FINNIFTY days, settlement price, STT trap on ITM exercise.
+Sources: Zerodha Varsity Modules 5 & 6 (Futures, Options). Sheldon Natenberg's Option Volatility & Pricing once you're comfortable.
+
+Phase 6 — Advanced (ongoing)
+Market microstructure: order book, market makers, HFT, latency arbitrage.
+Volatility surface: skew, term structure, IV percentile/rank.
+Algo / quant: backtesting frameworks (your bot is already here), risk-of-ruin, Kelly sizing, Sharpe/Sortino, walk-forward validation.
+Macro overlay: USD/INR, US10Y, crude, SGX/GIFT NIFTY pre-open, FOMC / RBI MPC calendar.
+A practical 90-day plan
+Week	Focus	Deliverable
+1–2	Phase 0 + 1	Read NSE bhavcopy unaided
+3–4	Phase 2 + 3	Daily journal: pull FII/DII + Participant OI, write 3-line summary
+5–8	Phase 4 + start Phase 5	Paper-trade options on your own bot, log every trade with thesis
+9–12	Phase 5 done	Build/own one options strategy end-to-end with rules
+13+	Phase 6	Add macro overlay & quantitative refinement to your bot

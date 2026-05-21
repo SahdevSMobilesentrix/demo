@@ -30,6 +30,7 @@ import {
   stopAutoRun as stopSignalAuto,
   getSignalState,
 } from "./signalRunner.js";
+import { csvFileFor, listDiagnosticsDays } from "./signal/diagnostics.js";
 import {
   getPaperState,
   updateSettings as updatePaperSettings,
@@ -45,6 +46,7 @@ const log = pino({ level: process.env.LOG_LEVEL || "info" });
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "public")));
+app.use("/learning", express.static(path.join(__dirname, "..", "learning")));
 
 // jwtToken → { apiKey, savedAt }. Cleared on logout / TTL.
 const apiKeyByJwt = new Map();
@@ -376,6 +378,34 @@ app.post("/api/signal/start", requireAuth, (req, res) => {
 
 app.post("/api/signal/stop", requireAuth, (_req, res) => {
   res.json(stopSignalAuto());
+});
+
+// ---- Diagnostics CSV: list available days + download a specific day ----
+
+app.get("/api/signal/diagnostics/days", requireAuth, (req, res) => {
+  const symbol = (req.query.symbol || "NIFTY").toString().toUpperCase();
+  const days = listDiagnosticsDays(symbol);
+  res.json({ symbol, days, count: days.length });
+});
+
+app.get("/api/signal/diagnostics.csv", requireAuth, (req, res) => {
+  const symbol = (req.query.symbol || "NIFTY").toString().toUpperCase();
+  // Accept "YYYY-MM-DD" or "YYYYMMDD"; default = today (IST).
+  const rawDate = (req.query.date || "").toString().replace(/-/g, "");
+  let date = new Date();
+  if (/^\d{8}$/.test(rawDate)) {
+    const y = +rawDate.slice(0, 4), m = +rawDate.slice(4, 6) - 1, d = +rawDate.slice(6, 8);
+    date = new Date(Date.UTC(y, m, d, 6, 0, 0)); // 06:00 UTC ≈ 11:30 IST — keeps inside day
+  }
+  const file = csvFileFor(symbol, date);
+  if (!nodeFs.existsSync(file)) {
+    return res.status(404).json({ ok: false, error: "no_diagnostics_for_date" });
+  }
+  const dayKey = rawDate || new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition",
+    `attachment; filename="${symbol}_diagnostics_${dayKey}.csv"`);
+  nodeFs.createReadStream(file).pipe(res);
 });
 
 // ---- Paper Trading endpoints ----

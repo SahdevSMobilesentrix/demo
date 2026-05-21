@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { evaluate } from "./signal/node-engine/signalEngine.js";
 import { buildBaseline, refreshAtEod } from "./signal/node-engine/historyManager.js";
+import { writeDiagnosticsRow } from "./signal/diagnostics.js";
 import { onEnginePayload, monitorOpenTrade } from "./paper/paperTrader.js";
 import { inSignalWindow as marketInSignalWindow, marketStatus as getMarketStatus } from "./marketClock.js";
 
@@ -49,6 +50,11 @@ export async function runOnce({ symbol = "NIFTY", skipDay = false } = {}) {
     state.lastRunAt = Date.now();
     state.lastError = null;
     state.latest = payload;
+
+    // Observe-only diagnostics CSV. Wrapped — never let it disturb the engine.
+    try { writeDiagnosticsRow({ symbol, dataRoot: DATA_ROOT, payload, now: new Date() }); }
+    catch { /* swallowed: diagnostics must not affect strategy */ }
+
     if (payload.signal) {
       state.history.unshift({
         receivedAt: state.lastRunAt,
