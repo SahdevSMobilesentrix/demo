@@ -6,6 +6,7 @@ import { loadInstruments, fetchQuotes } from "./brokers/angelMarketData.js";
 import { appendSnapshot } from "./signal/oiSnapshotWriter.js";
 import { monitorOpenTrade as paperMonitor } from "./paper/paperTrader.js";
 import { marketStatus as getMarketStatus } from "./marketClock.js";
+import { impliedVolatility, yearsToExpiry } from "./signal/iv.js";
 
 const POLL_SEC = 180;
 const LOOKBACK_MIN = 15;
@@ -254,18 +255,29 @@ export async function startOiTest({ jwtToken, apiKey }) {
           };
 
           let ceTotal = 0, peTotal = 0;
-          // strike -> { ce: { oi, ltp }, pe: { oi, ltp } }
+          // strike -> { ce: { oi, ltp, volume, iv }, pe: { oi, ltp, volume, iv } }
           const byStrike = {};
+          const expDate = parseExpiry(state.expiry);
+          const T = yearsToExpiry(expDate);
           for (const t of optTokens) {
             const row = q[t.symbol];
             if (!row) continue;
             if (!byStrike[t.strike]) byStrike[t.strike] = { ce: null, pe: null };
-            const cell = { oi: row.opnInterest ?? null, ltp: row.ltp ?? null, volume: row.tradeVolume ?? null };
-            if (t.side === "CE") byStrike[t.strike].ce = cell;
-            else                 byStrike[t.strike].pe = cell;
+            const isCall = t.side === "CE";
+            const iv = (row.ltp != null && curSpot != null && T != null)
+              ? impliedVolatility(row.ltp, curSpot, t.strike, T, isCall)
+              : null;
+            const cell = {
+              oi: row.opnInterest ?? null,
+              ltp: row.ltp ?? null,
+              volume: row.tradeVolume ?? null,
+              iv,
+            };
+            if (isCall) byStrike[t.strike].ce = cell;
+            else        byStrike[t.strike].pe = cell;
             if (row.opnInterest != null) {
-              if (t.side === "CE") ceTotal += row.opnInterest;
-              else                 peTotal += row.opnInterest;
+              if (isCall) ceTotal += row.opnInterest;
+              else        peTotal += row.opnInterest;
             }
           }
 
@@ -285,14 +297,38 @@ export async function startOiTest({ jwtToken, apiKey }) {
               const peCur = cur.pe?.oi ?? null;
               const ceRef = ref.ce?.oi ?? null;
               const peRef = ref.pe?.oi ?? null;
+              const ceLtpCur = cur.ce?.ltp ?? null;
+              const peLtpCur = cur.pe?.ltp ?? null;
+              const ceLtpRef = ref.ce?.ltp ?? null;
+              const peLtpRef = ref.pe?.ltp ?? null;
+              const ceIvCur  = cur.ce?.iv ?? null;
+              const peIvCur  = cur.pe?.iv ?? null;
+              const ceIvRef  = ref.ce?.iv ?? null;
+              const peIvRef  = ref.pe?.iv ?? null;
+              const ceVolCur = cur.ce?.volume ?? null;
+              const peVolCur = cur.pe?.volume ?? null;
+              const pcrOiCur = (peCur != null && ceCur)   ? peCur / ceCur : null;
+              const pcrOiRef = (peRef != null && ceRef)   ? peRef / ceRef : null;
+              const pcrVol   = (peVolCur != null && ceVolCur) ? peVolCur / ceVolCur : null;
               return {
                 strike,
                 ceOI: ceCur,
                 peOI: peCur,
-                ceLtp: cur.ce?.ltp ?? null,
-                peLtp: cur.pe?.ltp ?? null,
+                ceLtp: ceLtpCur,
+                peLtp: peLtpCur,
+                ceVol: ceVolCur,
+                peVol: peVolCur,
+                ceIv: ceIvCur,
+                peIv: peIvCur,
+                ceIvDelta: (ceIvCur != null && ceIvRef != null) ? ceIvCur - ceIvRef : null,
+                peIvDelta: (peIvCur != null && peIvRef != null) ? peIvCur - peIvRef : null,
                 ceDelta: (ceCur != null && ceRef != null) ? ceCur - ceRef : null,
                 peDelta: (peCur != null && peRef != null) ? peCur - peRef : null,
+                ceLtpDelta: (ceLtpCur != null && ceLtpRef != null) ? ceLtpCur - ceLtpRef : null,
+                peLtpDelta: (peLtpCur != null && peLtpRef != null) ? peLtpCur - peLtpRef : null,
+                pcrOi: pcrOiCur,
+                pcrOiDelta: (pcrOiCur != null && pcrOiRef != null) ? pcrOiCur - pcrOiRef : null,
+                pcrVol,
                 atm: strike === state.atm,
               };
             });
