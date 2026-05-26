@@ -1113,7 +1113,7 @@
 
           // Friendlier status messages now that the controls are gone.
           if (s.status === "running") {
-            setStatus("ok", "<b>Auto-tracking</b> · polling every minute · newest tick on top.");
+            setStatus("ok", "<b>Auto-tracking</b> · polling every 30 seconds · newest tick on top.");
           } else if (s.status === "paused-market-closed") {
             setStatus("", "<b>Paused</b> — market is closed. Will auto-resume on next session.");
           } else if (s.status === "starting") {

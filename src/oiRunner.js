@@ -1,5 +1,5 @@
 // Live OI tracker — no paper trading, no history, no persistence.
-// Polls the NIFTY option chain every minute and surfaces a rolling
+// Polls the NIFTY option chain every 30 seconds and surfaces a rolling
 // in-memory list of today's ticks via getOiState().
 
 import { loadInstruments, fetchQuotes } from "./brokers/angelMarketData.js";
@@ -8,7 +8,7 @@ import { monitorOpenTrade as paperMonitor } from "./paper/paperTrader.js";
 import { marketStatus as getMarketStatus } from "./marketClock.js";
 import { impliedVolatility, yearsToExpiry } from "./signal/iv.js";
 
-const POLL_SEC = 180;
+const POLL_SEC = 30;
 const LOOKBACK_MIN = 15;
 // Strike chain uses a longer window so build-up vs short-covering is readable.
 // 15 min is too noisy for per-strike classification.
