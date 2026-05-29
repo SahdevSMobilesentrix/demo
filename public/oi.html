@@ -287,44 +287,6 @@
         <div id="oiHistoryInfo" style="font-size:12px;color:var(--muted);margin-top:6px">&nbsp;</div>
       </div>
 
-      <!-- Smart Money Signal (Python engine bridge) -->
-      <div class="card" id="signalCard">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-          <h3 style="margin:0">Smart Money Signal</h3>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button type="button" id="sigRunBtn">Run Now</button>
-            <button type="button" id="sigAutoBtn" class="ghost">Start Auto (5 min)</button>
-            <select id="sigDiagDay" class="ghost" title="Diagnostics CSV day"
-              style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:inherit;font-size:13px"></select>
-            <button type="button" id="sigDiagDl" class="ghost" title="Download evaluation diagnostics CSV for the selected day">Download CSV</button>
-          </div>
-        </div>
-        <div id="sigMeta" style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Idle — click "Run Now" to evaluate the latest snapshot.</div>
-        <div id="sigBanner" class="sig-banner sig-none">
-          <div class="sig-head">No signal yet</div>
-          <div class="sig-sub">Start the OI Tracker above first, wait 2+ ticks, then click "Run Now".</div>
-        </div>
-        <div id="sigHistory" style="margin-top:10px"></div>
-      </div>
-
-      <style>
-        .sig-banner{border-radius:12px;padding:14px 16px;border:2px solid var(--border);background:var(--card-2,#0e1320)}
-        .sig-banner .sig-head{font-size:16px;font-weight:700;letter-spacing:.2px}
-        .sig-banner .sig-sub{font-size:12.5px;color:var(--muted);margin-top:4px}
-        .sig-banner .sig-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 16px;margin-top:10px;font-size:13px}
-        .sig-banner .sig-grid div b{display:block;font-size:11.5px;color:var(--muted);font-weight:500;margin-bottom:1px}
-        .sig-bull{border-color:#1f9c5a;background:linear-gradient(180deg,rgba(31,156,90,.18),rgba(31,156,90,.04))}
-        .sig-bear{border-color:#d04545;background:linear-gradient(180deg,rgba(208,69,69,.18),rgba(208,69,69,.04))}
-        .sig-none{opacity:.85}
-        .sig-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;margin-right:6px}
-        .pill-bull{background:#1f9c5a;color:#fff}
-        .pill-bear{background:#d04545;color:#fff}
-        .sig-hist table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
-        .sig-hist th,.sig-hist td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}
-        .sig-hist th{color:var(--muted);font-weight:500}
-        .sig-warn{color:#d2a13a;font-size:12px;margin-top:6px}
-      </style>
-
       <!-- Global heartbeat — visible regardless of sub-tab -->
       <div id="globalHeartbeat" class="heartbeat">
         <span class="hb-dot" id="hbDot"></span>
@@ -333,8 +295,6 @@
         <span id="hbMarket">Market: —</span>
         <span class="hb-sep">·</span>
         <span id="hbOiStatus">OI: idle</span>
-        <span class="hb-sep">·</span>
-        <span id="hbSignal">Signal: —</span>
         <span class="hb-sep">·</span>
         <span id="hbPaper">Paper: —</span>
         <span class="hb-grow"></span>
@@ -357,7 +317,6 @@
         <button type="button" class="tab" data-view="chain">Strike Chain</button>
         <button type="button" class="tab" data-view="chainpro">Option Chain Pro</button>
         <button type="button" class="tab" data-view="paper">Paper Trading</button>
-        <button type="button" class="tab" data-view="strategy">Strategy</button>
       </div>
 
       <div id="ticksView">
@@ -370,43 +329,34 @@
       </div>
 
       <div id="paperView" style="display:none">
-        <div class="ohlc">
-          <div class="ohlc-cell"><div class="lbl">Current Capital</div><div class="val" id="pCapital">–</div><div class="sub" id="pCapitalDelta">&nbsp;</div></div>
-          <div class="ohlc-cell"><div class="lbl">Today's P&amp;L</div><div class="val" id="pTodayPnl">–</div><div class="sub" id="pTodayN">0 trades</div></div>
-          <div class="ohlc-cell"><div class="lbl">Total P&amp;L</div><div class="val" id="pTotalPnl">–</div><div class="sub" id="pTotalN">0 trades</div></div>
-          <div class="ohlc-cell"><div class="lbl">Win Rate</div><div class="val" id="pWinRate">–</div><div class="sub" id="pWinLossSplit">0W / 0L</div></div>
-        </div>
-
+        <style>
+          .ap-books{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:8px}
+          .ap-book{border:1px solid var(--border);border-radius:12px;background:var(--card-2,#0e1320);padding:14px}
+          .ap-book-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+          .ap-tag{font-weight:800;font-size:13px;letter-spacing:.06em;padding:3px 10px;border-radius:999px}
+          .ap-follow{background:rgba(31,156,90,.2);color:#1f9c5a}
+          .ap-fade{background:rgba(208,69,69,.2);color:#d04545}
+          .ap-cap{font-size:18px;font-weight:800}
+          .ap-cap.p-pos{color:#1f9c5a}.ap-cap.p-neg{color:#d04545}
+          .ap-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 14px;font-size:13px;margin-bottom:4px}
+          .ap-kpis div b{display:block;font-size:11px;color:var(--muted);font-weight:500}
+          .ap-section-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:10px 0 2px}
+          .ap-open b{font-size:13.5px}
+        </style>
         <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px">
-            <h3 style="margin:0">Open Paper Trade</h3>
-            <button type="button" id="pManualExitBtn" class="danger" style="display:none">Exit Now</button>
+          <h3 style="margin:0 0 4px">Auto Paper Trader — FOLLOW vs FADE</h3>
+          <div style="font-size:12.5px;color:var(--muted);line-height:1.5">
+            Two automatic books, 1 lot each. On every confirmed Strong OI signal,
+            <b style="color:#1f9c5a">FOLLOW</b> trades with the option sellers and
+            <b style="color:#d04545">FADE</b> trades against them. Compare their P&amp;L to see whether to follow or fade the signal.
           </div>
-          <div id="pOpenBody"><p class="empty">No open trade. Waiting for next BULL signal…</p></div>
-        </div>
-
-        <div class="card">
-          <h3 style="margin:0 0 8px">Settings</h3>
-          <form id="pSettingsForm" class="settings-grid">
-            <label>Initial Capital (₹)<input type="number" id="pInitCap" min="1000" step="500" required></label>
-            <label>Default Lots<input type="number" id="pLots" min="1" max="20" step="1" required></label>
-            <label>Max Trades / Day<input type="number" id="pMaxTrades" min="1" max="10" step="1" required></label>
-            <label>Slippage (%)<input type="number" id="pSlippage" min="0" max="2" step="0.1" required></label>
-            <div class="settings-actions">
-              <button type="submit">Save Settings</button>
-              <button type="button" class="ghost" id="pExportBtn">Export CSV</button>
-              <button type="button" class="danger" id="pResetBtn">Reset Capital</button>
-            </div>
-          </form>
-          <div id="pSettingsStatus" style="font-size:12px;color:var(--muted);margin-top:6px">&nbsp;</div>
-        </div>
-
-        <div class="card">
-          <h3 style="margin:0 0 8px">Trade History</h3>
-          <div class="table-scroll">
-            <div id="pHistoryWrap"><p class="empty">No trades yet.</p></div>
+          <div id="apMeta" style="font-size:12px;color:var(--muted);margin-top:8px">&nbsp;</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+            <button type="button" class="ghost" id="apExportBtn">Export CSV</button>
+            <button type="button" class="danger" id="apResetBtn">Reset Both Books</button>
           </div>
         </div>
+        <div id="apBooks" class="ap-books"></div>
       </div>
 
       <style>
@@ -626,196 +576,6 @@
         </div>
       </div>
 
-      <div id="strategyView" style="display:none">
-        <div class="strategy-doc">
-
-          <!-- 1. The big idea -->
-          <div class="card">
-            <h3>The Big Idea — Follow the Option Writers</h3>
-            <p>
-              Option <b>buyers</b> are usually retail. Option <b>writers</b> (sellers) are usually
-              well-capitalised desks — they need margin, they hedge, and they don't sell options
-              at a strike unless they believe price <i>won't</i> get there. So when writers
-              aggressively <b>sell puts below spot</b>, they're saying "I'll defend this level" →
-              <span class="pill bull">Bullish</span>. When they aggressively <b>sell calls above
-              spot</b>, they're capping the upside → <span class="pill bear">Bearish</span>.
-              No conviction either way → <span class="pill neut">Neutral</span>.
-            </p>
-            <p class="muted">
-              This bot is <b>long-only</b> and <b>intraday</b>. It only buys ATM CE on a confirmed
-              bullish setup. Bearish signals are detected but <i>not</i> paper-traded.
-            </p>
-            <div class="strategy-grid">
-              <div class="item"><b>Instrument</b><span>NIFTY weekly options</span></div>
-              <div class="item"><b>Cadence</b><span>OI snapshot every ~3 min</span></div>
-              <div class="item"><b>Signal window</b><span>09:45 – 15:00 IST</span></div>
-              <div class="item"><b>VIX gate</b><span>Skip day if India VIX moves ≥ 4% intraday</span></div>
-              <div class="item"><b>Strike scan</b><span>ATM ± 5 strikes (50-pt step)</span></div>
-              <div class="item"><b>Position</b><span>Buy 1 ATM CE · 1 trade at a time</span></div>
-            </div>
-          </div>
-
-          <!-- 2. What "writing" looks like -->
-          <div class="card">
-            <h3>Step 1 — Spotting a Real Writer</h3>
-            <p>
-              For each strike we look at the change in Open Interest (ΔOI) between snapshots and ask:
-              <i>is this fresh writing, or just noise / unwinding?</i> A strike is flagged
-              <b>is_writing = true</b> only when all three are true at once:
-            </p>
-            <ul>
-              <li><b>OI is rising</b> (ΔOI &gt; 0) — new positions are being added.</li>
-              <li><b>Premium (LTP) is flat or falling</b> over the last ~12 min — sellers are
-                pressing price down, not getting squeezed.</li>
-              <li><b>Volume ÷ OI &lt; 0.6</b> — positions are sticking on the book, not flipping.
-                High vol/OI = day-trader churn, which we reject.</li>
-            </ul>
-            <p class="muted">
-              Why all three? Because OI alone can rise from buyers <i>or</i> sellers. Only when OI
-              rises <i>while</i> premium fades on low churn do we know the seller has the upper hand.
-            </p>
-          </div>
-
-          <!-- 3. The 4-rule trigger -->
-          <div class="card">
-            <h3>Step 2 — The 4-Rule Trigger (need ≥ 3 of 4)</h3>
-            <p>
-              For a <span class="pill bull">BULL</span> setup we scan every <b>PE strike at or below
-              spot</b> inside ATM ± 5. For a <span class="pill bear">BEAR</span> setup we scan every
-              <b>CE strike at or above spot</b>. Each candidate strike must score at least
-              <b>3 out of 4</b>:
-            </p>
-            <ol>
-              <li><b>Unusual size</b> — <span class="kbd">rel_oi_delta ≥ 1.6</span>. This strike's OI
-                build is at least 1.6× the historical median build for this time-of-day bucket.
-                Filters out "normal" OI drift.</li>
-              <li><b>Sticky positions</b> — <span class="kbd">vol_oi_ratio &lt; 0.6</span>.
-                Confirms the writer is committing capital, not scalping.</li>
-              <li><b>Writing fingerprint</b> — <span class="kbd">is_writing == true</span> (the
-                three-part check from Step 1).</li>
-              <li><b>Whole-band agreement</b> — the cumulative ΔOI trend across ATM ± 3 over the last
-                5 snapshots also leans the same way (4 of the last 5 diffs in the right direction).</li>
-            </ol>
-            <p>
-              If <i>no</i> strike clears 3/4, the engine prints <span class="kbd">no_trigger</span>
-              and we stand aside. That is the most common state — and it's the feature, not a bug.
-              <b>Most days will not produce a trade.</b>
-            </p>
-          </div>
-
-          <!-- 4. Trade construction -->
-          <div class="card">
-            <h3>Step 3 — Building the Trade</h3>
-            <p>If a BULL trigger fires and market is open:</p>
-            <ul>
-              <li><b>Entry:</b> Buy 1 lot ATM CE at latest LTP (× slippage factor).</li>
-              <li><b>Stop / Invalidation:</b> the heaviest PE-writing strike at or below spot. If
-                spot breaks that level, the writers' "floor" failed → exit.</li>
-              <li><b>Target:</b> spot × 1.006 (about +0.6%).</li>
-              <li><b>Time stop:</b> 15:00 IST — flat into close, no overnight risk.</li>
-              <li><b>Score decay:</b> if the engine's score drops below 3 for 2 polls in a row while
-                we're in the trade, exit early. The thesis has cooled.</li>
-              <li><b>Capital check:</b> premium cost must fit current paper capital.</li>
-              <li><b>Throttle:</b> one open trade at a time; capped per-day by
-                <span class="kbd">maxTradesPerDay</span>.</li>
-            </ul>
-          </div>
-
-          <!-- 5. Why no trade today -->
-          <div class="card">
-            <h3>Why You'll See Many "No-Trade" Days</h3>
-            <p>
-              The Live Ticks table shows a <b>Market Bias</b> column ("Strong Bullish" etc.). That
-              badge is a quick <i>net-OI-flow z-score</i> — a visual mood ring. It is <b>not</b> the
-              same thing as the 4-rule trigger. You can have a "Strong Bullish" mood ring without a
-              tradeable signal, because:
-            </p>
-            <ul>
-              <li><b>Unwinding ≠ writing.</b> A rally driven by put-buyers <i>closing</i> their puts
-                (negative Put ΔOI) looks bullish on PCR but fails rule 3 (<b>is_writing</b>) and
-                rule 1 (rel_oi_delta goes negative). The bot deliberately ignores these.</li>
-              <li><b>Diffuse builds don't count.</b> +50 L of put OI spread across 6 strikes won't
-                clear the 1.6× bar on any <i>single</i> strike. The strategy wants concentrated
-                conviction, not background drift.</li>
-              <li><b>Cold baseline.</b> Until enough days of history accumulate, the baseline median
-                is thin and the engine is conservative.</li>
-              <li><b>VIX shock.</b> If India VIX swings ≥ 4% intraday, the whole day is skipped.</li>
-              <li><b>Outside window.</b> Triggers before 09:45 or after 15:00 are ignored.</li>
-            </ul>
-            <p class="muted">
-              Rule of thumb: a quiet, sideways day with lots of unwinding will almost always be
-              skipped. The bot is built to wait for one clean setup, not to participate in every
-              wiggle.
-            </p>
-          </div>
-
-          <!-- 6. Worked example -->
-          <div class="card">
-            <h3>Worked Example — A Clean Bull Trigger</h3>
-            <div class="example">
-              Time <span class="kbd">11:42 IST</span> · Spot <span class="kbd">23 715</span> ·
-              ATM <span class="kbd">23 700</span>.
-              <br><br>
-              Over the last few snapshots, <b>23 700 PE</b> added
-              <span class="up">+14.9 L OI</span> while its premium <i>dropped</i> from ₹78 → ₹71,
-              on vol/OI of 0.31. Baseline median for this 3-min bucket is 5.2 L, so
-              <span class="kbd">rel_oi_delta = 14.9 / 5.2 ≈ 2.87</span>. Cumulative ATM±3 trend:
-              4 of the last 5 diffs negative (CE − PE shrinking) → <b>bullish</b>.
-              <br><br>
-              <b>Rule check on 23 700 PE:</b>
-              ① rel_oi_delta 2.87 ≥ 1.6 ✓ ·
-              ② vol/OI 0.31 &lt; 0.6 ✓ ·
-              ③ is_writing ✓ ·
-              ④ cum_trend bullish ✓ — <b>4/4</b>.
-              <br><br>
-              Engine emits <span class="pill bull">BULL</span>, score 4.
-              Bot buys 1 lot of <b>23 700 CE</b> at LTP+slippage.
-              Stop = 23 650 (next heavy PE-write below). Target = 23 715 × 1.006 ≈ 23 857.
-              Time stop = 15:00. Exit on whichever hits first.
-            </div>
-            <p class="muted" style="margin-top:10px">
-              Bearish mirror: same 4 checks on a CE strike <i>at or above</i> spot. Detected,
-              logged, but not paper-traded (long-only).
-            </p>
-          </div>
-
-          <!-- 7. Tuning knobs -->
-          <div class="card">
-            <h3>Knobs (Where to Loosen if You Want More Trades)</h3>
-            <p>Change one at a time and watch a week before changing another:</p>
-            <ul>
-              <li><span class="kbd">REL_OI_THRESHOLD</span> in <code>features.js</code> —
-                default <b>1.6</b>. Most common cause of <i>no_trigger</i>. Lower to 1.3 → more
-                signals, more false positives.</li>
-              <li><span class="kbd">CUM_CONFIRM</span> in <code>features.js</code> — default
-                <b>4 of 5</b>. Lower to 3 → trend flips faster, more chop.</li>
-              <li><span class="kbd">ATM_BAND_SIGNAL</span> in <code>signalEngine.js</code> —
-                default <b>± 5</b>. Widen to ± 7 → more candidate strikes, stops further away.</li>
-              <li><span class="kbd">MAX_VIX_CHANGE_PCT</span> — default <b>4%</b>. Raise to trade
-                more event days (riskier).</li>
-            </ul>
-          </div>
-
-          <!-- 8. Disclaimer -->
-          <div class="card">
-            <h3 style="margin:0 0 8px">Disclaimer</h3>
-            <div class="disclaimer">
-              <b>Educational use only.</b>
-              <p style="margin:6px 0 0">
-                This dashboard is built for research and learning, not investment advice.
-                Open-interest analysis describes positioning — it does <i>not</i> predict price.
-                Signals can and do fail, especially around news events, expiry, and illiquid strikes.
-                Paper-trading P&amp;L approximates slippage and brokerage but cannot model real
-                fill quality. Trading in derivatives carries substantial risk of loss; only deploy
-                capital you can afford to lose, and consult a SEBI-registered advisor before taking
-                live positions. The authors and operators of this tool accept no liability for
-                trading decisions made from its output.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <footer class="site-footer">
         <span>NIFTY F&amp;O OI Tracker</span>
         <a href="/learning/stock-market-book.html" target="_blank" rel="noopener">Learn — Stock Market Book ↗</a>
@@ -955,11 +715,28 @@
         return "num";
       }
 
+      // Fingerprint of a tick's OI data — used to collapse repeated rows where
+      // only the spot (and rounded signal) moved but the OI numbers are unchanged.
+      function tickDataKey(t) {
+        return [t.ceTotal, t.peTotal, t.ceDelta, t.peDelta, t.netFlow, t.pcrOI].join("|");
+      }
+
       function renderTicks(ticks) {
         if (!ticks || ticks.length === 0) {
           tableWrap.innerHTML = '<p class="empty">Waiting for ticks…</p>';
           return;
         }
+        // Collapse consecutive ticks that carry the same OI data into one row,
+        // keeping the first (newest) occurrence of each distinct data set.
+        const seen = [];
+        let prevKey = null;
+        for (const t of ticks) {
+          const key = tickDataKey(t);
+          if (key === prevKey) continue;
+          seen.push(t);
+          prevKey = key;
+        }
+        ticks = seen;
         let html = '<table><thead><tr>'
           + '<th>Time</th>'
           + '<th>NIFTY Spot</th>'
@@ -1141,186 +918,10 @@
       setInterval(pollHistoryDays, 60000);
       // poll() is now driven by the global scheduler below, not its own interval.
 
-      // ---------------- Smart Money Signal ----------------
-      const sigRunBtn   = document.getElementById("sigRunBtn");
-      const sigAutoBtn  = document.getElementById("sigAutoBtn");
-      const sigBanner   = document.getElementById("sigBanner");
-      const sigMeta     = document.getElementById("sigMeta");
-      const sigHistEl   = document.getElementById("sigHistory");
-
-      function fmtTime(ms){
-        if (!ms) return "—";
-        return new Date(ms).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata",hour12:false});
-      }
-      function legText(legs){
-        if (!Array.isArray(legs)) return "";
-        return legs.map(l => `${l.action} ${l.strike} ${l.opt_type}`).join("   ·   ");
-      }
-      function renderBanner(state){
-        const s = state.latest && state.latest.signal;
-        const reason = state.latest && state.latest.reason;
-        if (!s){
-          sigBanner.className = "sig-banner sig-none";
-          sigBanner.innerHTML =
-            `<div class="sig-head">No signal</div>`
-            + `<div class="sig-sub">${reason ? "Reason: " + escHtml(reason) : "Engine has not fired any trigger yet."}</div>`;
-          return;
-        }
-        const side = s.side === "BULL" ? "bull" : "bear";
-        const pill = side === "bull" ? "pill-bull" : "pill-bear";
-        const tgtPct = (s.target_pct*100).toFixed(2) + "%";
-        const breakdown = Object.entries(s.score_breakdown||{})
-          .map(([k,v]) => `<span style="margin-right:8px">${v?"✅":"⬜"} ${escHtml(k)}</span>`)
-          .join("");
-        sigBanner.className = "sig-banner sig-" + side;
-        sigBanner.innerHTML =
-            `<div class="sig-head">`
-          +   `<span class="sig-pill ${pill}">${s.side}</span>`
-          +   `Score ${s.score}/4 · Trigger ${s.trigger_strike} · ATM ${s.atm} · Spot ${(+s.spot).toFixed(2)}`
-          + `</div>`
-          + `<div class="sig-sub">${escHtml(legText(s.legs))}</div>`
-          + `<div class="sig-grid">`
-          +   `<div><b>Invalidation</b>${s.invalidation_strike}</div>`
-          +   `<div><b>Target move</b>${tgtPct}</div>`
-          +   `<div><b>Max Pain</b>${s.max_pain ?? "—"}</div>`
-          +   `<div><b>Cum Trend</b>${escHtml(s.cum_trend||"—")}</div>`
-          +   `<div><b>VIX</b>${(+s.vix).toFixed(2)}</div>`
-          +   `<div><b>Expiry</b>${escHtml(s.expiry||"—")}</div>`
-          + `</div>`
-          + `<div class="sig-sub" style="margin-top:8px">${breakdown}</div>`
-          + ((s.notes && s.notes.length) ? `<div class="sig-warn">⚠ ${s.notes.map(escHtml).join(" · ")}</div>` : "");
-      }
-      function renderHistory(hist){
-        if (!hist || !hist.length){ sigHistEl.innerHTML = ""; return; }
-        let html = `<div class="sig-hist"><div style="font-size:12px;color:var(--muted);margin-bottom:4px">Today's signals</div>`
-          + `<table><thead><tr><th>Time</th><th>Side</th><th>Score</th><th>Trigger</th><th>Spot</th><th>Trade</th></tr></thead><tbody>`;
-        for (const h of hist){
-          const pill = h.side === "BULL" ? "pill-bull" : "pill-bear";
-          html += `<tr><td>${fmtTime(h.receivedAt)}</td>`
-                + `<td><span class="sig-pill ${pill}">${h.side}</span></td>`
-                + `<td>${h.score}/4</td>`
-                + `<td>${h.trigger_strike}</td>`
-                + `<td>${(+h.spot).toFixed(2)}</td>`
-                + `<td>${escHtml(legText(h.legs))}</td></tr>`;
-        }
-        html += `</tbody></table></div>`;
-        sigHistEl.innerHTML = html;
-      }
-      function renderSigMeta(state){
-        const bits = [];
-        bits.push(`Status: <b>${escHtml(state.status)}</b>`);
-        bits.push(`Auto: <b>${state.autoRun ? "ON" : "OFF"}</b>`);
-        bits.push(`Market: <b>${state.inMarketHours ? "open" : "closed"}</b>`);
-        if (state.lastRunAt) bits.push(`Last run: <b>${fmtTime(state.lastRunAt)}</b>`);
-        if (state.lastError) bits.push(`<span style="color:var(--danger)">${escHtml(state.lastError)}</span>`);
-        sigMeta.innerHTML = bits.join(" · ");
-        sigAutoBtn.textContent = state.autoRun ? "Stop Auto" : "Start Auto (5 min)";
-      }
-      async function pollSignal(){
-        try {
-          const r = await fetch("/api/signal/state", { headers: authHeaders() });
-          if (handle401(r)) return;
-          const s = await r.json();
-          renderSigMeta(s);
-          renderBanner(s);
-          renderHistory(s.history);
-        } catch {}
-      }
-      sigRunBtn.addEventListener("click", async () => {
-        sigRunBtn.disabled = true; sigRunBtn.textContent = "Running…";
-        try {
-          const r = await fetch("/api/signal/run-now", {
-            method: "POST",
-            headers: { ...authHeaders(), "Content-Type": "application/json" },
-            body: JSON.stringify({ symbol: "NIFTY" }),
-          });
-          if (handle401(r)) return;
-          await pollSignal();
-        } finally {
-          sigRunBtn.disabled = false; sigRunBtn.textContent = "Run Now";
-        }
-      });
-      sigAutoBtn.addEventListener("click", async () => {
-        const st = await (await fetch("/api/signal/state", { headers: authHeaders() })).json();
-        const url = st.autoRun ? "/api/signal/stop" : "/api/signal/start";
-        await fetch(url, {
-          method: "POST",
-          headers: { ...authHeaders(), "Content-Type": "application/json" },
-          body: JSON.stringify({ symbol: "NIFTY" }),
-        });
-        pollSignal();
-      });
-      // pollSignal() is now driven by the global scheduler below.
-
-      // ---------------- Diagnostics CSV ----------------
-      const sigDiagDay = document.getElementById("sigDiagDay");
-      const sigDiagDl  = document.getElementById("sigDiagDl");
-      function fmtDay(d) {
-        return d.length === 8 ? `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}` : d;
-      }
-      async function refreshDiagDays() {
-        try {
-          const r = await fetch("/api/signal/diagnostics/days?symbol=NIFTY", { headers: authHeaders() });
-          if (handle401(r)) return;
-          const j = await r.json();
-          const days = j.days || [];
-          const prev = sigDiagDay.value;
-          sigDiagDay.innerHTML = "";
-          if (!days.length) {
-            const o = document.createElement("option");
-            o.value = ""; o.textContent = "No CSV yet";
-            sigDiagDay.appendChild(o);
-            sigDiagDl.disabled = true;
-            return;
-          }
-          for (const d of days) {
-            const o = document.createElement("option");
-            o.value = d; o.textContent = fmtDay(d);
-            sigDiagDay.appendChild(o);
-          }
-          if (prev && days.includes(prev)) sigDiagDay.value = prev;
-          sigDiagDl.disabled = false;
-        } catch {}
-      }
-      sigDiagDl.addEventListener("click", async () => {
-        const day = sigDiagDay.value;
-        if (!day) return;
-        const tok = getToken();
-        if (!tok) { alert("Please log in first."); return; }
-        // Use fetch + blob so we can send the Bearer token (a plain <a href> can't).
-        const r = await fetch(`/api/signal/diagnostics.csv?symbol=NIFTY&date=${day}`, {
-          headers: authHeaders(),
-        });
-        if (handle401(r)) return;
-        if (!r.ok) { alert("Download failed: " + r.status); return; }
-        const blob = await r.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = `NIFTY_diagnostics_${day}.csv`;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      });
-      // Refresh the day list whenever we poll the signal — keeps it cheap & current.
-      const _origPollSignal = pollSignal;
-      pollSignal = async function patched() {
-        await _origPollSignal();
-        refreshDiagDays();
-      };
-
-      // ---------------- Paper Trading ----------------
-      const pCapitalEl      = document.getElementById("pCapital");
-      const pCapitalDeltaEl = document.getElementById("pCapitalDelta");
-      const pTodayPnlEl     = document.getElementById("pTodayPnl");
-      const pTodayNEl       = document.getElementById("pTodayN");
-      const pTotalPnlEl     = document.getElementById("pTotalPnl");
-      const pTotalNEl       = document.getElementById("pTotalN");
-      const pWinRateEl      = document.getElementById("pWinRate");
-      const pWinLossEl      = document.getElementById("pWinLossSplit");
-      const pOpenBody       = document.getElementById("pOpenBody");
-      const pManualExitBtn  = document.getElementById("pManualExitBtn");
-      const pHistoryWrap    = document.getElementById("pHistoryWrap");
-      const pSettingsForm   = document.getElementById("pSettingsForm");
-      const pSettingsStatus = document.getElementById("pSettingsStatus");
+      // ---------------- Auto Paper Trader (FOLLOW vs FADE) ----------------
+      const apMeta    = document.getElementById("apMeta");
+      const apBooksEl = document.getElementById("apBooks");
+      let   lastAutoSnap = null;
 
       function inr(v, withSign = true) {
         if (v == null || !isFinite(v)) return "–";
@@ -1328,136 +929,114 @@
         return sign + "₹" + Number(v).toLocaleString("en-IN", { maximumFractionDigits: 2 });
       }
       function pnlClass(v) { return v > 0 ? "p-pos" : v < 0 ? "p-neg" : ""; }
-
-      function renderPaperKpis(s) {
-        const cap = s.currentCapital;
-        const init = s.settings?.initialCapital ?? 0;
-        pCapitalEl.textContent = inr(cap, false);
-        pCapitalEl.className = "val " + pnlClass(cap - init);
-        pCapitalDeltaEl.textContent = (cap - init >= 0 ? "+" : "") + inr(cap - init, false) + " vs initial";
-
-        pTodayPnlEl.textContent = inr(s.todayPnl);
-        pTodayPnlEl.className = "val " + pnlClass(s.todayPnl);
-        pTodayNEl.textContent = (s.todayTrades || 0) + " trade" + (s.todayTrades === 1 ? "" : "s");
-
-        pTotalPnlEl.textContent = inr(s.totalPnl);
-        pTotalPnlEl.className = "val " + pnlClass(s.totalPnl);
-        pTotalNEl.textContent = (s.totalTrades || 0) + " trade" + (s.totalTrades === 1 ? "" : "s");
-
-        const total = (s.wins || 0) + (s.losses || 0);
-        const wr = total ? ((s.wins / total) * 100).toFixed(1) + "%" : "–";
-        pWinRateEl.textContent = wr;
-        pWinLossEl.textContent = (s.wins || 0) + "W / " + (s.losses || 0) + "L";
+      function apTime(ms) {
+        if (!ms) return "–";
+        return new Date(ms).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour12: false });
       }
 
-      function renderOpenTrade(t) {
-        if (!t) {
-          pOpenBody.innerHTML = '<p class="empty">No open trade. Waiting for next BULL signal…</p>';
-          pManualExitBtn.style.display = "none";
-          return;
+      function renderAutoBook(name, b, init) {
+        const cap = b.currentCapital ?? init;
+        const delta = cap - init;
+        const open = b.openTrade;
+        let openHtml;
+        if (!open) {
+          openHtml = '<p class="empty" style="margin:6px 0">Flat — waiting for next confirmed signal.</p>';
+        } else {
+          const mtm = open.mark?.mtmNet ?? 0;
+          openHtml =
+              '<div class="ap-open"><b>BUY ' + open.lots + ' lot' + (open.lots > 1 ? 's' : '')
+            +   ' · ' + open.atmStrike + ' ' + open.optType + ' @ ₹' + (+open.entry.premium).toFixed(2) + '</b>'
+            + '<div class="p-open-grid" style="margin-top:6px">'
+            +   '<div><b>Signal</b>' + escHtml(open.signalBias || open.sigDir) + '</div>'
+            +   '<div><b>Entry Spot</b>' + (+open.entry.spot).toFixed(2) + '</div>'
+            +   '<div><b>Live Premium</b>' + (open.mark?.premium != null ? '₹' + (+open.mark.premium).toFixed(2) : '–') + '</div>'
+            +   '<div><b>Live P&L</b><span class="' + pnlClass(mtm) + '">' + inr(mtm) + '</span></div>'
+            +   '<div><b>Target</b>₹' + (+open.entry.targetPremium).toFixed(2) + ' <span class="muted">(+₹' + (open.entry.targetAmt || '700') + ')</span></div>'
+            +   '<div><b>Stop</b>₹' + (+open.entry.stopPremium).toFixed(2) + ' <span class="muted">(-₹' + (open.entry.stopAmt || '700') + ')</span></div>'
+            +   '<div><b>Entry</b>' + escHtml(open.entry.tsIST || apTime(open.entry.ts)) + '</div>'
+            +   '<div><b>ID</b>' + escHtml(open.id) + '</div>'
+            + '</div></div>';
         }
-        pManualExitBtn.style.display = "";
-        const mtm = t.mtmPnl ?? 0;
-        pOpenBody.innerHTML =
-            '<div style="font-size:13px">'
-          + '<b style="font-size:14px">BUY ' + t.lots + ' lot' + (t.lots>1?"s":"")
-          +   ' · ' + t.atmStrike + ' ' + t.optType + ' @ ₹' + (+t.entry.premium).toFixed(2) + '</b>'
+        let hist;
+        if (!b.history || !b.history.length) {
+          hist = '<p class="empty" style="margin:6px 0">No closed trades yet.</p>';
+        } else {
+          hist = '<div class="p-hist"><table><thead><tr>'
+            + '<th>Date</th><th>Opt</th><th>Entry</th><th>Exit</th>'
+            + '<th class="num">Net P&L</th><th>Reason</th></tr></thead><tbody>';
+          for (const t of b.history) {
+            hist += '<tr>'
+              + '<td>' + escHtml(t.date) + '</td>'
+              + '<td>' + t.atmStrike + ' ' + t.optType + '</td>'
+              + '<td>' + (+t.entry.premium).toFixed(2) + '</td>'
+              + '<td>' + (t.exit ? (+t.exit.premium).toFixed(2) : '–') + '</td>'
+              + '<td class="num ' + pnlClass(t.netPnl) + '">' + inr(t.netPnl) + '</td>'
+              + '<td><span class="p-reason p-r-' + escHtml(t.exit?.reason || '') + '">' + escHtml(t.exit?.reason || 'OPEN') + '</span></td>'
+              + '</tr>';
+          }
+          hist += '</tbody></table></div>';
+        }
+        return '<div class="ap-book">'
+          + '<div class="ap-book-head"><span class="ap-tag ap-' + name.toLowerCase() + '">' + name + '</span>'
+          +   '<span class="ap-cap ' + pnlClass(delta) + '">' + inr(cap, false) + '</span></div>'
+          + '<div class="ap-kpis">'
+          +   '<div><b>Realized</b><span class="' + pnlClass(b.realizedPnl) + '">' + inr(b.realizedPnl) + '</span></div>'
+          +   '<div><b>Today</b><span class="' + pnlClass(b.todayPnl) + '">' + inr(b.todayPnl) + '</span></div>'
+          +   '<div><b>Trades</b>' + (b.totalTrades || 0) + '</div>'
+          +   '<div><b>Win rate</b>' + (b.winRate != null ? b.winRate + '%' : '–')
+          +     ' <span class="muted">(' + (b.wins || 0) + 'W/' + (b.losses || 0) + 'L)</span></div>'
           + '</div>'
-          + '<div class="p-open-grid">'
-          + '<div><b>Entry Spot</b>' + (+t.entry.spot).toFixed(2) + '</div>'
-          + '<div><b>Current Spot</b>' + (t.currentSpot != null ? (+t.currentSpot).toFixed(2) : '–') + '</div>'
-          + '<div><b>Current Premium</b>' + (t.currentPremium != null ? '₹' + (+t.currentPremium).toFixed(2) : '–') + '</div>'
-          + '<div><b>Live P&L</b><span class="' + pnlClass(mtm) + '">' + inr(mtm) + '</span></div>'
-          + '<div><b>Stop (spot)</b>' + t.entry.invalidationStrike + '</div>'
-          + '<div><b>Target (spot)</b>' + (+t.entry.targetSpot).toFixed(2) + '</div>'
-          + '<div><b>Entry Time</b>' + new Date(t.entry.ts).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata",hour12:false}) + '</div>'
-          + '<div><b>Trade ID</b>' + escHtml(t.id) + '</div>'
+          + '<div class="ap-section-label">Open trade</div>' + openHtml
+          + '<div class="ap-section-label">History</div>' + hist
           + '</div>';
       }
 
-      function renderPaperHistory(rows) {
-        if (!rows || !rows.length) { pHistoryWrap.innerHTML = '<p class="empty">No trades yet.</p>'; return; }
-        let html = '<div class="p-hist"><table><thead><tr>'
-          + '<th>Date</th><th>Strike</th><th>Entry ₹</th><th>Exit ₹</th>'
-          + '<th class="num">Gross</th><th class="num">Costs</th><th class="num">Net P&L</th>'
-          + '<th>Reason</th></tr></thead><tbody>';
-        for (const t of rows) {
-          html += '<tr>'
-            + '<td>' + escHtml(t.date) + '</td>'
-            + '<td>' + t.atmStrike + ' ' + t.optType + '</td>'
-            + '<td>' + (+t.entry.premium).toFixed(2) + '</td>'
-            + '<td>' + (t.exit ? (+t.exit.premium).toFixed(2) : '–') + '</td>'
-            + '<td class="num">' + inr(t.grossPnl) + '</td>'
-            + '<td class="num" style="color:var(--muted)">−' + inr(t.costs, false) + '</td>'
-            + '<td class="num ' + pnlClass(t.netPnl) + '">' + inr(t.netPnl) + '</td>'
-            + '<td><span class="p-reason p-r-' + escHtml(t.exit?.reason||'') + '">' + escHtml(t.exit?.reason||'OPEN') + '</span></td>'
-            + '</tr>';
-        }
-        html += '</tbody></table></div>';
-        pHistoryWrap.innerHTML = html;
+      function renderAuto(s) {
+        const cfg = s.config || {};
+        const init = cfg.initialCapital ?? 0;
+        const c = s.confirm || {};
+        apMeta.innerHTML =
+            'Market: <b>' + escHtml(s.market?.status || '–') + '</b> · '
+          + 'Signal confirm: <b>' + escHtml(c.dir || 'none') + ' ' + (c.count || 0) + '/' + (c.required || 0) + '</b> · '
+          + 'Entry |net|≥' + cfg.strongNet + ' for ' + cfg.confirmTicks + ' ticks · '
+          + 'TP ₹' + (cfg.targetAmt || 700) + ' / SL ₹' + (cfg.stopAmt || 700) + ' · '
+          + 'Premium ₹' + (cfg.premiumMin || 50) + '–' + (cfg.premiumMax || 300) + ' · '
+          + 'square-off ' + escHtml(cfg.squareOff || '');
+        const books = s.books || {};
+        apBooksEl.innerHTML =
+            renderAutoBook('FOLLOW', books.FOLLOW || {}, init)
+          + renderAutoBook('FADE', books.FADE || {}, init);
       }
 
-      function renderPaperSettings(s) {
-        document.getElementById("pInitCap").value   = s.initialCapital;
-        document.getElementById("pLots").value      = s.defaultLotSize;
-        document.getElementById("pMaxTrades").value = s.maxTradesPerDay;
-        document.getElementById("pSlippage").value  = s.slippagePct ?? 0.5;
-      }
-
-      async function pollPaper() {
+      async function pollAutoPaper() {
         try {
-          const r = await fetch("/api/paper/state", { headers: authHeaders() });
+          const r = await fetch("/api/auto-paper/state", { headers: authHeaders() });
           if (handle401(r)) return;
           const s = await r.json();
-          renderPaperKpis(s);
-          renderOpenTrade(s.openTrade);
-          renderPaperHistory(s.history);
-          if (s.settings) renderPaperSettings(s.settings);
+          lastAutoSnap = s;
+          renderAuto(s);
         } catch {}
       }
 
-      pSettingsForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const body = {
-          initialCapital:  +document.getElementById("pInitCap").value,
-          defaultLotSize:  +document.getElementById("pLots").value,
-          maxTradesPerDay: +document.getElementById("pMaxTrades").value,
-          slippagePct:     +document.getElementById("pSlippage").value,
-        };
-        pSettingsStatus.textContent = "Saving…";
-        const r = await fetch("/api/paper/settings", {
-          method: "POST",
-          headers: { ...authHeaders(), "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        pSettingsStatus.textContent = r.ok ? "✓ Saved" : "✗ Save failed";
-        pollPaper();
-      });
-
-      pManualExitBtn.addEventListener("click", async () => {
-        if (!confirm("Exit the open paper trade at current LTP?")) return;
-        await fetch("/api/paper/exit-now", {
-          method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" },
-        });
-        pollPaper();
-      });
-
-      document.getElementById("pResetBtn").addEventListener("click", async () => {
-        if (!confirm("Reset capital and archive all trade history? Old trades are archived, not deleted.")) return;
-        await fetch("/api/paper/reset", {
-          method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" },
-        });
-        pollPaper();
-      });
-
-      document.getElementById("pExportBtn").addEventListener("click", () => {
+      document.getElementById("apExportBtn").addEventListener("click", async () => {
+        const r = await fetch("/api/auto-paper/export.csv", { headers: authHeaders() });
+        if (handle401(r)) return;
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = "/api/paper/export.csv";
-        a.download = "paper_trades.csv";
+        a.href = url; a.download = "auto_paper_trades.csv";
         document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       });
 
-      // pollPaper() is now driven by the global scheduler below.
+      document.getElementById("apResetBtn").addEventListener("click", async () => {
+        if (!confirm("Reset both FOLLOW and FADE books? Trades are archived, then cleared.")) return;
+        await fetch("/api/auto-paper/reset", {
+          method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" },
+        });
+        pollAutoPaper();
+      });
+      // pollAutoPaper() is driven by the global scheduler below.
 
       // ---------------- Global background scheduler ----------------
       // Runs all three pollers on a single clock. Catches up instantly on
@@ -1468,14 +1047,11 @@
       const hbLabel     = document.getElementById("hbLabel");
       const hbMarket    = document.getElementById("hbMarket");
       const hbOiStatus  = document.getElementById("hbOiStatus");
-      const hbSignal    = document.getElementById("hbSignal");
       const hbPaper     = document.getElementById("hbPaper");
       const hbLastUpd   = document.getElementById("hbLastUpdate");
 
       let lastOk = 0;
       let lastOiSnap = null;
-      let lastSigSnap = null;
-      let lastPaperSnap = null;
       let lastMarket = null;
 
       const MARKET_LABELS = {
@@ -1512,16 +1088,10 @@
           hbOiStatus.textContent = "OI: " + (lastOiSnap.status || "idle")
             + (ticks ? " (" + ticks + " ticks)" : "");
         }
-        if (lastSigSnap) {
-          const s = lastSigSnap.latest?.signal;
-          hbSignal.textContent = "Signal: "
-            + (s ? s.side + " " + s.score + "/4" : (lastSigSnap.latest?.reason || "—"))
-            + (lastSigSnap.autoRun ? " · auto" : "");
-        }
-        if (lastPaperSnap) {
-          const open = lastPaperSnap.openTrade ? "1 open" : "flat";
-          hbPaper.textContent = "Paper: " + open
-            + " · ₹" + Number(lastPaperSnap.currentCapital || 0).toLocaleString("en-IN");
+        if (lastAutoSnap && lastAutoSnap.books) {
+          const f = lastAutoSnap.books.FOLLOW || {}, d = lastAutoSnap.books.FADE || {};
+          const nOpen = (f.openTrade ? 1 : 0) + (d.openTrade ? 1 : 0);
+          hbPaper.textContent = "Paper: " + nOpen + " open · F " + inr(f.realizedPnl || 0) + " / D " + inr(d.realizedPnl || 0);
         }
         if (lastMarket) {
           let label = MARKET_LABELS[lastMarket.status] || lastMarket.status;
@@ -1548,22 +1118,6 @@
           }
         } catch {}
       };
-      const _origPollSig = pollSignal;
-      pollSignal = async function() {
-        try {
-          const r = await fetch("/api/signal/state", { headers: authHeaders() });
-          if (r.ok) { lastSigSnap = await r.json(); lastOk = Date.now(); }
-        } catch {}
-        await _origPollSig();
-      };
-      const _origPollPaper = pollPaper;
-      pollPaper = async function() {
-        try {
-          const r = await fetch("/api/paper/state", { headers: authHeaders() });
-          if (r.ok) { lastPaperSnap = await r.json(); lastOk = Date.now(); }
-        } catch {}
-        await _origPollPaper();
-      };
 
       // Self-rescheduling scheduler — interval adapts to tab visibility
       let schedTimer = null;
@@ -1579,7 +1133,7 @@
       }
       async function tickAll() {
         try {
-          await Promise.allSettled([poll(), pollSignal(), pollPaper(), pollMarket()]);
+          await Promise.allSettled([poll(), pollAutoPaper(), pollMarket()]);
         } finally {
           updateHeartbeat();
           scheduleNext();
@@ -1600,7 +1154,6 @@
       const chainView = document.getElementById("chainView");
       const chainProView = document.getElementById("chainProView");
       const paperView = document.getElementById("paperView");
-      const strategyView = document.getElementById("strategyView");
       document.querySelectorAll("#subTabs .tab").forEach(btn => {
         btn.addEventListener("click", () => {
           document.querySelectorAll("#subTabs .tab").forEach(b => b.classList.remove("active"));
@@ -1610,10 +1163,23 @@
           chainView.style.display     = v === "chain"    ? "" : "none";
           chainProView.style.display  = v === "chainpro" ? "" : "none";
           paperView.style.display     = v === "paper"    ? "" : "none";
-          strategyView.style.display  = v === "strategy" ? "" : "none";
           if (v === "chainpro") renderChainPro();
+          // Refresh paper LTP/MTM immediately when the tab is opened.
+          if (v === "paper") pollAutoPaper();
         });
       });
+
+      // Paper Trading needs fresh LTP/MTM — poll once a second while its tab is
+      // open and visible. The shared scheduler still covers it at the slower
+      // cadence; this just adds a faster refresh when the user is watching.
+      let _apFastInFlight = false;
+      setInterval(() => {
+        if (document.hidden) return;
+        if (!paperView || paperView.style.display === "none") return;
+        if (_apFastInFlight) return;
+        _apFastInFlight = true;
+        pollAutoPaper().finally(() => { _apFastInFlight = false; });
+      }, 1000);
 
       // ===================== Option Chain Pro =====================
       // Mock data generator — structured so we can swap in /api/oi/state.strikes later.

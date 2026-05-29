@@ -15,7 +15,7 @@ const TRADES_PATH   = path.join(PAPER_DIR, "trades.json");
 const ARCHIVE_DIR   = path.join(PAPER_DIR, "archive");
 
 const DEFAULT_SETTINGS = {
-  initialCapital: 15000,
+  initialCapital: 20000,
   defaultLotSize: 1,
   maxTradesPerDay: 1,
   longOnly: true,

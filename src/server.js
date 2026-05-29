@@ -25,19 +25,11 @@ import {
   getOiState,
 } from "./oiRunner.js";
 import {
-  runOnce as runSignalOnce,
-  startAutoRun as startSignalAuto,
-  stopAutoRun as stopSignalAuto,
-  getSignalState,
-} from "./signalRunner.js";
-import { csvFileFor, listDiagnosticsDays } from "./signal/diagnostics.js";
-import {
-  getPaperState,
-  updateSettings as updatePaperSettings,
-  resetCapital as resetPaperCapital,
-  exportCsv as exportPaperCsv,
-  manualExit as paperManualExit,
-} from "./paper/paperTrader.js";
+  getAutoPaperState,
+  updateAutoConfig,
+  resetAuto as resetAutoPaper,
+  exportAutoCsv,
+} from "./paper/autoPaperTrader.js";
 import { marketSnapshot } from "./marketClock.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -235,7 +227,6 @@ async function bootFromSession() {
   } catch (e) {
     log.warn({ err: e.message }, "oi tracker resume failed");
   }
-  try { startSignalAuto({ symbol: "NIFTY" }); } catch {}
 }
 bootFromSession().catch(() => {});
 
@@ -306,9 +297,6 @@ app.post("/api/angel/login", async (req, res) => {
       .then(r => log.info({ status: r.status }, "oi tracker auto-started"))
       .catch(e => log.warn({ err: e.message }, "oi tracker auto-start failed"));
 
-    // Auto-start signal engine auto-run too (already gated on market clock).
-    try { startSignalAuto({ symbol: "NIFTY" }); } catch {}
-
     res.json({ ok: true, ...out });
   } catch (err) {
     log.warn({ err: err.message }, "angel login failed");
@@ -358,87 +346,32 @@ app.get("/api/oi/history-days", (_req, res) => {
   }
 });
 
-// ---- Smart Money Signal endpoints (Python engine bridge) ----
-
-app.get("/api/signal/state", requireAuth, (_req, res) => {
-  res.json(getSignalState());
-});
-
-app.post("/api/signal/run-now", requireAuth, async (req, res) => {
-  const symbol = (req.body?.symbol || "NIFTY").toUpperCase();
-  const skipDay = !!req.body?.skipDay;
-  const out = await runSignalOnce({ symbol, skipDay });
-  res.json(out);
-});
-
-app.post("/api/signal/start", requireAuth, (req, res) => {
-  const symbol = (req.body?.symbol || "NIFTY").toUpperCase();
-  res.json(startSignalAuto({ symbol }));
-});
-
-app.post("/api/signal/stop", requireAuth, (_req, res) => {
-  res.json(stopSignalAuto());
-});
-
-// ---- Diagnostics CSV: list available days + download a specific day ----
-
-app.get("/api/signal/diagnostics/days", requireAuth, (req, res) => {
-  const symbol = (req.query.symbol || "NIFTY").toString().toUpperCase();
-  const days = listDiagnosticsDays(symbol);
-  res.json({ symbol, days, count: days.length });
-});
-
-app.get("/api/signal/diagnostics.csv", requireAuth, (req, res) => {
-  const symbol = (req.query.symbol || "NIFTY").toString().toUpperCase();
-  // Accept "YYYY-MM-DD" or "YYYYMMDD"; default = today (IST).
-  const rawDate = (req.query.date || "").toString().replace(/-/g, "");
-  let date = new Date();
-  if (/^\d{8}$/.test(rawDate)) {
-    const y = +rawDate.slice(0, 4), m = +rawDate.slice(4, 6) - 1, d = +rawDate.slice(6, 8);
-    date = new Date(Date.UTC(y, m, d, 6, 0, 0)); // 06:00 UTC ≈ 11:30 IST — keeps inside day
-  }
-  const file = csvFileFor(symbol, date);
-  if (!nodeFs.existsSync(file)) {
-    return res.status(404).json({ ok: false, error: "no_diagnostics_for_date" });
-  }
-  const dayKey = rawDate || new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition",
-    `attachment; filename="${symbol}_diagnostics_${dayKey}.csv"`);
-  nodeFs.createReadStream(file).pipe(res);
-});
-
-// ---- Paper Trading endpoints ----
-
 app.get("/api/market/status", (_req, res) => {
   res.json(marketSnapshot());
 });
 
-app.get("/api/paper/state", requireAuth, (_req, res) => {
-  res.json(getPaperState());
+// ---- Auto Paper Trading (FOLLOW vs FADE, driven by live OI bias) ----
+
+app.get("/api/auto-paper/state", requireAuth, (_req, res) => {
+  res.json(getAutoPaperState());
 });
 
-app.post("/api/paper/settings", requireAuth, (req, res) => {
+app.post("/api/auto-paper/config", requireAuth, (req, res) => {
   try {
-    const out = updatePaperSettings(req.body || {});
-    res.json({ ok: true, settings: out });
+    res.json({ ok: true, config: updateAutoConfig(req.body || {}) });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.message });
   }
 });
 
-app.post("/api/paper/exit-now", requireAuth, (_req, res) => {
-  res.json(paperManualExit());
+app.post("/api/auto-paper/reset", requireAuth, (_req, res) => {
+  res.json(resetAutoPaper());
 });
 
-app.post("/api/paper/reset", requireAuth, (_req, res) => {
-  res.json(resetPaperCapital());
-});
-
-app.get("/api/paper/export.csv", requireAuth, (_req, res) => {
+app.get("/api/auto-paper/export.csv", requireAuth, (_req, res) => {
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", 'attachment; filename="paper_trades.csv"');
-  res.send(exportPaperCsv());
+  res.setHeader("Content-Disposition", 'attachment; filename="auto_paper_trades.csv"');
+  res.send(exportAutoCsv());
 });
 
 const port = process.env.PORT || 3000;

@@ -4,7 +4,7 @@
 
 import { loadInstruments, fetchQuotes } from "./brokers/angelMarketData.js";
 import { appendSnapshot } from "./signal/oiSnapshotWriter.js";
-import { monitorOpenTrade as paperMonitor } from "./paper/paperTrader.js";
+import { onOiTick as autoPaperTick } from "./paper/autoPaperTrader.js";
 import { marketStatus as getMarketStatus } from "./marketClock.js";
 import { impliedVolatility, yearsToExpiry } from "./signal/iv.js";
 
@@ -85,20 +85,38 @@ function findNiftyIndex(instruments) {
   return candidates[0]?.inst || null;
 }
 
+// Sum OI change only over strikes present in BOTH snapshots. A strike entering
+// or leaving the window (when the ATM re-centers) contributes nothing, so a
+// total taken over a shifting strike set can no longer fake OI "flow".
+function matchedOiDelta(refByStrike, curByStrike) {
+  let ceDelta = 0, peDelta = 0;
+  if (!refByStrike || !curByStrike) return { ceDelta, peDelta };
+  for (const k of Object.keys(curByStrike)) {
+    const cur = curByStrike[k];
+    const ref = refByStrike[k];
+    if (!ref) continue;
+    if (cur.ce?.oi != null && ref.ce?.oi != null) ceDelta += cur.ce.oi - ref.ce.oi;
+    if (cur.pe?.oi != null && ref.pe?.oi != null) peDelta += cur.pe.oi - ref.pe.oi;
+  }
+  return { ceDelta, peDelta };
+}
+
 function computeBias(history, latest) {
   const cutoff = latest.ts - LOOKBACK_MIN * 60 * 1000;
   let ref = null;
   for (const h of history) { if (h.ts <= cutoff) ref = h; else break; }
   if (!ref) return { ready: false };
 
-  const ceDelta = latest.ceTotal - ref.ceTotal;
-  const peDelta = latest.peTotal - ref.peTotal;
+  // Per-strike matched deltas — robust to the ATM window shifting between ref and now.
+  const { ceDelta, peDelta } = matchedOiDelta(ref.byStrike, latest.byStrike);
   const netFlow = peDelta - ceDelta;
   const pcrOI = latest.peTotal / Math.max(latest.ceTotal, 1);
 
+  // Normalize against the recent distribution of matched deltas vs the window base.
   const recent = history.slice(-60);
-  const ceDeltas = recent.map((h, i, a) => i > 0 ? h.ceTotal - a[0].ceTotal : 0);
-  const peDeltas = recent.map((h, i, a) => i > 0 ? h.peTotal - a[0].peTotal : 0);
+  const base = recent[0];
+  const ceDeltas = recent.map(h => matchedOiDelta(base.byStrike, h.byStrike).ceDelta);
+  const peDeltas = recent.map(h => matchedOiDelta(base.byStrike, h.byStrike).peDelta);
   const std = (xs) => {
     const m = xs.reduce((a,b)=>a+b,0)/Math.max(xs.length,1);
     return Math.sqrt(xs.reduce((a,b)=>a+(b-m)**2,0)/Math.max(xs.length,1)) || 1;
@@ -107,6 +125,12 @@ function computeBias(history, latest) {
   const peN = peDelta / std(peDeltas);
   const net = peN - ceN;
 
+  // Bias polarity — option-WRITER (seller) view, the standard OI-writing read:
+  //   net > 0  => puts written faster than calls => support building => BULLISH
+  //   net < 0  => calls written faster => resistance building => BEARISH
+  // Do NOT invert this to "trade as a buyer". To trade against the signal use the
+  // FADE book in paper/autoPaperTrader.js — that keeps this label correct while
+  // still letting you test fading. See memory: auto-paper-follow-vs-fade.
   let bias = "Neutral";
   if (Math.abs(netFlow) > 10000) {
     if (net > 1.5)        bias = "Strong Bullish";
@@ -237,13 +261,19 @@ export async function startOiTest({ jwtToken, apiKey }) {
           const idx = q.NIFTY50 || {};
           const curSpot = idx.ltp ?? spot;
 
-          // Dynamic ATM: follow live spot. If the strike has moved, rebuild
-          // the option-token window so next poll covers the new ATM ±10.
-          const newAtm = Math.round(curSpot / STRIKE_STEP) * STRIKE_STEP;
-          if (newAtm !== state.atm) {
-            state.atm = newAtm;
-            const rebuilt = pickStrikes(instruments, expiry.str, newAtm);
-            if (rebuilt.length > 0) optTokens = rebuilt;
+          // Dynamic ATM with hysteresis. Only re-center the strike window once
+          // spot has drifted a clear ¾-strike past the current ATM. Without this
+          // deadband, spot jittering across a half-strike boundary (e.g. ~23975,
+          // between the 23950 and 24000 strikes) flips the ATM every poll, which
+          // swaps a deep strike in/out of the ±10 window and injects phantom
+          // 60L–1.5Cr jumps into total OI — the cause of the flip-flopping signal.
+          if (Math.abs(curSpot - state.atm) > STRIKE_STEP * 0.75) {
+            const newAtm = Math.round(curSpot / STRIKE_STEP) * STRIKE_STEP;
+            if (newAtm !== state.atm) {
+              state.atm = newAtm;
+              const rebuilt = pickStrikes(instruments, expiry.str, newAtm);
+              if (rebuilt.length > 0) optTokens = rebuilt;
+            }
           }
           state.ohlc = {
             ltp: idx.ltp ?? null,
@@ -345,9 +375,6 @@ export async function startOiTest({ jwtToken, apiKey }) {
             });
           } catch {}
 
-          // Paper trader: check stop/target/time on open trade after fresh data.
-          try { paperMonitor(); } catch {}
-
           history.push(latest);
           if (history.length > 240) history.splice(0, history.length - 240);
           const r = computeBias(history, latest);
@@ -367,6 +394,20 @@ export async function startOiTest({ jwtToken, apiKey }) {
             strength: r.strength ?? null,
           });
           if (state.ticks.length > 1000) state.ticks.length = 1000;
+
+          // Auto paper trader (FOLLOW vs FADE books) reacts to the live bias.
+          // Self-guarded; never throws into the poll loop.
+          autoPaperTick({
+            ts: latest.ts,
+            tsIST: fmtIST(),
+            day: curDay,
+            spot: curSpot,
+            atm: state.atm,
+            bias: r.ready ? r.bias : null,
+            net: r.net ?? null,
+            strength: r.strength ?? null,
+            byStrike,
+          });
         } catch (e) {
           // Swallow transient poll errors; loop continues.
         }
