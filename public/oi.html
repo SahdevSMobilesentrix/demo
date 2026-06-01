@@ -953,7 +953,8 @@
             +   '<div><b>Live P&L</b><span class="' + pnlClass(mtm) + '">' + inr(mtm) + '</span></div>'
             +   '<div><b>Target</b>₹' + (+open.entry.targetPremium).toFixed(2) + ' <span class="muted">(+₹' + (open.entry.targetAmt || '700') + ')</span></div>'
             +   '<div><b>Stop</b>₹' + (+open.entry.stopPremium).toFixed(2) + ' <span class="muted">(-₹' + (open.entry.stopAmt || '700') + ')</span></div>'
-            +   '<div><b>Entry</b>' + escHtml(open.entry.tsIST || apTime(open.entry.ts)) + '</div>'
+            +   '<div><b>Buy time</b>' + escHtml(open.entry.tsIST || apTime(open.entry.ts)) + '</div>'
+            +   '<div><b>Charges</b>−₹' + (+(open.entry.costs || 0)).toFixed(2) + ' <span class="muted">(entry leg)</span></div>'
             +   '<div><b>ID</b>' + escHtml(open.id) + '</div>'
             + '</div></div>';
         }
@@ -962,14 +963,20 @@
           hist = '<p class="empty" style="margin:6px 0">No closed trades yet.</p>';
         } else {
           hist = '<div class="p-hist"><table><thead><tr>'
-            + '<th>Date</th><th>Opt</th><th>Entry</th><th>Exit</th>'
-            + '<th class="num">Net P&L</th><th>Reason</th></tr></thead><tbody>';
+            + '<th>Date</th><th>Opt</th><th>Buy</th><th>Sell</th>'
+            + '<th class="num">Gross</th><th class="num">Charges</th><th class="num">Net P&L</th>'
+            + '<th>Reason</th></tr></thead><tbody>';
           for (const t of b.history) {
+            const buyTime = t.entry?.tsIST || apTime(t.entry?.ts);
+            const sellTime = t.exit ? (t.exit.tsIST || apTime(t.exit.ts)) : null;
+            const subTime = (s) => '<div style="font-size:11px;color:var(--muted)">' + escHtml(s) + '</div>';
             hist += '<tr>'
               + '<td>' + escHtml(t.date) + '</td>'
               + '<td>' + t.atmStrike + ' ' + t.optType + '</td>'
-              + '<td>' + (+t.entry.premium).toFixed(2) + '</td>'
-              + '<td>' + (t.exit ? (+t.exit.premium).toFixed(2) : '–') + '</td>'
+              + '<td>₹' + (+t.entry.premium).toFixed(2) + subTime(buyTime) + '</td>'
+              + '<td>' + (t.exit ? '₹' + (+t.exit.premium).toFixed(2) + subTime(sellTime) : '–') + '</td>'
+              + '<td class="num ' + pnlClass(t.grossPnl) + '">' + inr(t.grossPnl) + '</td>'
+              + '<td class="num">−' + inr(Math.abs(t.costs || 0), false) + '</td>'
               + '<td class="num ' + pnlClass(t.netPnl) + '">' + inr(t.netPnl) + '</td>'
               + '<td><span class="p-reason p-r-' + escHtml(t.exit?.reason || '') + '">' + escHtml(t.exit?.reason || 'OPEN') + '</span></td>'
               + '</tr>';

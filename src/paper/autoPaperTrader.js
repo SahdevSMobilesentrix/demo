@@ -36,7 +36,7 @@ const DEFAULT_CONFIG = {
   strongNet: 1.5,          // |net| score that counts as a "Strong" signal
   confirmTicks: 3,         // consecutive same-direction strong ticks before entry (was 2 — more confirmation)
   targetAmt: 700,          // book profit at ₹700 flat per trade
-  stopAmt: 700,            // stop loss at ₹700 flat per trade (1:1 risk-reward)
+  stopAmt: 500,            // stop loss at ₹500 flat per trade (risk ₹500 to make ₹700 ≈ 1:1.4 R:R)
   premiumMin: 50,          // skip strikes with premium below ₹50 (too cheap, bad liquidity)
   premiumMax: 300,         // skip strikes with premium above ₹300 (too expensive for capital)
   entryStart: "09:30",     // no entries before this (IST)
@@ -299,6 +299,31 @@ export function onOiTick(tick) {
     }
 
     saveState(state);
+  } catch {
+    // Never let a paper-trade bug disturb the OI poll loop.
+  }
+}
+
+/**
+ * Lightweight refresh between full OI ticks. Re-marks open trades against the
+ * latest option LTPs (so the UI's live premium / MTM updates every couple of
+ * seconds instead of once per 30s OI poll) and fires prompt price/time exits
+ * (TARGET / STOP / SQUAREOFF / MARKET_CLOSE). Deliberately does NOT touch the
+ * signal-confirmation tracker or open new trades — those stay on the slower
+ * bias cadence in onOiTick.
+ *
+ * @param {object} tick  ts(ms), tsIST(string), spot, atm, byStrike
+ */
+export function markOpenTrades(tick) {
+  try {
+    const state = loadState();
+    let touched = false;
+    for (const book of BOOKS) {
+      if (!bookOpen(state.trades, book)) continue;
+      tryMonitor(state, book, tick);
+      touched = true;
+    }
+    if (touched) saveState(state); // skip pointless writes when both books are flat
   } catch {
     // Never let a paper-trade bug disturb the OI poll loop.
   }
