@@ -368,10 +368,12 @@
         .p-neg{color:#d04545;font-weight:700}
         .p-open-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 16px;font-size:13px;margin-top:8px}
         .p-open-grid div b{display:block;font-size:11.5px;color:var(--muted);font-weight:500;margin-bottom:1px}
+        .p-hist{overflow-x:auto;-webkit-overflow-scrolling:touch}
         .p-hist table{width:100%;border-collapse:collapse;font-size:12.5px}
-        .p-hist th,.p-hist td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+        .p-hist th,.p-hist td{padding:6px 7px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;vertical-align:top}
         .p-hist th{color:var(--muted);font-weight:500}
         .p-hist .num{text-align:right;font-variant-numeric:tabular-nums}
+        .p-sub{font-size:10.5px;color:var(--muted);margin-top:1px;font-weight:400}
         .p-reason{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600}
         .p-r-TARGET{background:rgba(31,156,90,.2);color:#1f9c5a}
         .p-r-STOP,.p-r-INVALIDATION{background:rgba(208,69,69,.2);color:#d04545}
@@ -964,20 +966,19 @@
         } else {
           hist = '<div class="p-hist"><table><thead><tr>'
             + '<th>Date</th><th>Opt</th><th>Buy</th><th>Sell</th>'
-            + '<th class="num">Gross</th><th class="num">Charges</th><th class="num">Net P&L</th>'
-            + '<th>Reason</th></tr></thead><tbody>';
+            + '<th class="num">Net P&L</th><th>Reason</th></tr></thead><tbody>';
           for (const t of b.history) {
             const buyTime = t.entry?.tsIST || apTime(t.entry?.ts);
             const sellTime = t.exit ? (t.exit.tsIST || apTime(t.exit.ts)) : null;
-            const subTime = (s) => '<div style="font-size:11px;color:var(--muted)">' + escHtml(s) + '</div>';
+            const sub = (s) => '<div class="p-sub">' + s + '</div>';
+            // Gross + brokerage folded into a sub-line so the table fits the card.
+            const netSub = 'G ' + inr(t.grossPnl) + ' · chg −' + inr(Math.abs(t.costs || 0), false);
             hist += '<tr>'
               + '<td>' + escHtml(t.date) + '</td>'
               + '<td>' + t.atmStrike + ' ' + t.optType + '</td>'
-              + '<td>₹' + (+t.entry.premium).toFixed(2) + subTime(buyTime) + '</td>'
-              + '<td>' + (t.exit ? '₹' + (+t.exit.premium).toFixed(2) + subTime(sellTime) : '–') + '</td>'
-              + '<td class="num ' + pnlClass(t.grossPnl) + '">' + inr(t.grossPnl) + '</td>'
-              + '<td class="num">−' + inr(Math.abs(t.costs || 0), false) + '</td>'
-              + '<td class="num ' + pnlClass(t.netPnl) + '">' + inr(t.netPnl) + '</td>'
+              + '<td>₹' + (+t.entry.premium).toFixed(2) + sub(escHtml(buyTime)) + '</td>'
+              + '<td>' + (t.exit ? '₹' + (+t.exit.premium).toFixed(2) + sub(escHtml(sellTime)) : '–') + '</td>'
+              + '<td class="num ' + pnlClass(t.netPnl) + '">' + inr(t.netPnl) + sub(netSub) + '</td>'
               + '<td><span class="p-reason p-r-' + escHtml(t.exit?.reason || '') + '">' + escHtml(t.exit?.reason || 'OPEN') + '</span></td>'
               + '</tr>';
           }
