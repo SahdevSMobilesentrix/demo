@@ -222,6 +222,19 @@ function markOpen(open, cfg, tick) {
   return { curLtp, exitPrem };
 }
 
+// Price- and time-based exits only. These must fire promptly (on every 1s
+// LTP refresh) so a trade squares off the moment it crosses its ±₹ target/stop
+// or the square-off / market-close time — otherwise loss/profit can overshoot
+// the configured caps while waiting for the slow 30s tick.
+function priceTimeExitReason(cfg, open, exitPrem) {
+  const ms = getMarketStatus();
+  if (exitPrem != null && exitPrem >= open.entry.targetPremium) return "TARGET";
+  if (exitPrem != null && exitPrem <= open.entry.stopPremium)   return "STOP";
+  if (pastSquareOff(cfg))                                       return "SQUAREOFF";
+  if (!ms.trading && ms.status !== "closed_premarket")          return "MARKET_CLOSE";
+  return null;
+}
+
 function tryMonitor(state, book, tick) {
   const open = bookOpen(state.trades, book);
   if (!open) return;
@@ -230,14 +243,12 @@ function tryMonitor(state, book, tick) {
   const curLtp = m?.curLtp ?? null;
   const exitPrem = m?.exitPrem ?? null;
 
-  const ms = getMarketStatus();
+  // Signal-based REVERSAL is evaluated only here (slow 30s tick) because the
+  // confirmation tracker only changes on the bias cadence; price/time exits are
+  // shared with the fast path.
   const confDir = confirmedDir(cfg);
-  let reason = null;
-  if (exitPrem != null && exitPrem >= open.entry.targetPremium)        reason = "TARGET";
-  else if (exitPrem != null && exitPrem <= open.entry.stopPremium)     reason = "STOP";
-  else if (confDir && confDir !== open.sigDir)                         reason = "REVERSAL";
-  else if (pastSquareOff(cfg))                                         reason = "SQUAREOFF";
-  else if (!ms.trading && ms.status !== "closed_premarket")            reason = "MARKET_CLOSE";
+  let reason = priceTimeExitReason(cfg, open, exitPrem);
+  if (!reason && confDir && confDir !== open.sigDir) reason = "REVERSAL";
   if (!reason) return;
 
   closeBookTrade(state, open, reason, curLtp, tick);
@@ -285,9 +296,11 @@ export function openTradeLegs() {
 
 /**
  * Refresh the live premium / MTM on open trades from fresh LTPs so the UI
- * updates every second. Deliberately runs NO exit or entry logic — TARGET /
- * STOP / REVERSAL / SQUAREOFF exits stay on the slower onOiTick cadence, so
- * trade behavior and results are unchanged. Self-guarded; never throws.
+ * updates every second, AND fire the price/time exits (TARGET / STOP /
+ * SQUAREOFF / MARKET_CLOSE) immediately when crossed — so a position squares
+ * off within ~1s instead of overshooting its ±₹ caps while waiting for the 30s
+ * tick. Signal-based REVERSAL and new entries stay on the slower onOiTick
+ * cadence. Self-guarded; never throws.
  *
  * @param {object} tick  ts(ms), tsIST(string), spot, byStrike
  */
@@ -299,7 +312,10 @@ export function refreshOpenMarks(tick) {
     for (const book of BOOKS) {
       const open = bookOpen(state.trades, book);
       if (!open) continue;
-      if (markOpen(open, cfg, tick)) touched = true;
+      const m = markOpen(open, cfg, tick);
+      const reason = priceTimeExitReason(cfg, open, m?.exitPrem ?? null);
+      if (reason) closeBookTrade(state, open, reason, m?.curLtp ?? null, tick);
+      touched = true;
     }
     if (touched) saveState(state); // skip pointless writes when both books are flat
   } catch {
