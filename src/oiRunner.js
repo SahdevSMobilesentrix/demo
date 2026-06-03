@@ -4,20 +4,11 @@
 
 import { loadInstruments, fetchQuotes } from "./brokers/angelMarketData.js";
 import { appendSnapshot } from "./signal/oiSnapshotWriter.js";
-import { onOiTick as autoPaperTick, markOpenTrades } from "./paper/autoPaperTrader.js";
+import { onOiTick as autoPaperTick, openTradeLegs, refreshOpenMarks } from "./paper/autoPaperTrader.js";
 import { marketStatus as getMarketStatus } from "./marketClock.js";
 import { impliedVolatility, yearsToExpiry } from "./signal/iv.js";
 
-// Quotes are fetched every QUOTE_POLL_SEC so the option LTP, OHLC and the live
-// MTM on open paper trades refresh quickly (and TARGET/STOP exits fire promptly).
-// The heavier OI-bias signal + snapshot + new-entry logic still runs only every
-// BIAS_POLL_SEC — its normalization windows are tick-count based, so keeping that
-// cadence at 30s preserves the existing signal behavior. One batched quote request
-// covers all ~43 tokens, so a 2s cadence stays comfortably within Angel's quote
-// rate limit (~1 req/sec).
-const QUOTE_POLL_SEC = 2;
-const BIAS_POLL_SEC = 30;
-const BIAS_EVERY = Math.max(1, Math.round(BIAS_POLL_SEC / QUOTE_POLL_SEC));
+const POLL_SEC = 30;
 const LOOKBACK_MIN = 15;
 // Strike chain uses a longer window so build-up vs short-covering is readable.
 // 15 min is too noisy for per-strike classification.
@@ -235,7 +226,6 @@ export async function startOiTest({ jwtToken, apiKey }) {
 
       // In-memory only — never persisted.
       let history = [];
-      let tickCount = 0; // counts quote polls; every BIAS_EVERY-th is a bias tick
       state.status = "running";
 
       while (state.status === "running" || state.status === "paused-market-closed") {
@@ -374,74 +364,91 @@ export async function startOiTest({ jwtToken, apiKey }) {
             });
           state.strikes = strikes;
 
-          const isBiasTick = tickCount % BIAS_EVERY === 0;
-          if (isBiasTick) {
-            // ---- slow cadence (~30s): OI-bias signal, snapshot, new entries ----
-            // Persist canonical snapshot for the signal engine.
-            try {
-              appendSnapshot({
-                symbol: "NIFTY",
-                expiryStr: state.expiry,
-                spot: curSpot,
-                vix: null,
-                byStrike,
-              });
-            } catch {}
-
-            history.push(latest);
-            if (history.length > 240) history.splice(0, history.length - 240);
-            const r = computeBias(history, latest);
-
-            state.ticks.unshift({
-              ts: latest.ts,
-              tsIST: fmtIST(),
-              day: curDay,
+          // Persist canonical snapshot for the signal engine.
+          try {
+            appendSnapshot({
+              symbol: "NIFTY",
+              expiryStr: state.expiry,
               spot: curSpot,
-              ceTotal, peTotal,
-              ceDelta: r.ceDelta ?? null,
-              peDelta: r.peDelta ?? null,
-              netFlow: r.netFlow ?? null,
-              pcrOI: r.pcrOI ?? null,
-              net: r.net ?? null,
-              bias: r.ready ? r.bias : "WARMUP",
-              strength: r.strength ?? null,
-            });
-            if (state.ticks.length > 1000) state.ticks.length = 1000;
-
-            // Auto paper trader (FOLLOW vs FADE books) reacts to the live bias:
-            // confirms signals, monitors open trades, opens new entries.
-            // Self-guarded; never throws into the poll loop.
-            autoPaperTick({
-              ts: latest.ts,
-              tsIST: fmtIST(),
-              day: curDay,
-              spot: curSpot,
-              atm: state.atm,
-              bias: r.ready ? r.bias : null,
-              net: r.net ?? null,
-              strength: r.strength ?? null,
+              vix: null,
               byStrike,
             });
-          } else {
-            // ---- fast cadence (~2s): refresh live premium/MTM on open trades
-            // and fire prompt price/time exits, without touching the signal
-            // engine (no new entries, no confirm-tracker changes).
-            markOpenTrades({
-              ts: latest.ts,
-              tsIST: fmtIST(),
-              day: curDay,
-              spot: curSpot,
-              atm: state.atm,
-              byStrike,
-            });
-          }
-          tickCount++;
+          } catch {}
+
+          history.push(latest);
+          if (history.length > 240) history.splice(0, history.length - 240);
+          const r = computeBias(history, latest);
+
+          state.ticks.unshift({
+            ts: latest.ts,
+            tsIST: fmtIST(),
+            day: curDay,
+            spot: curSpot,
+            ceTotal, peTotal,
+            ceDelta: r.ceDelta ?? null,
+            peDelta: r.peDelta ?? null,
+            netFlow: r.netFlow ?? null,
+            pcrOI: r.pcrOI ?? null,
+            net: r.net ?? null,
+            bias: r.ready ? r.bias : "WARMUP",
+            strength: r.strength ?? null,
+          });
+          if (state.ticks.length > 1000) state.ticks.length = 1000;
+
+          // Auto paper trader (FOLLOW vs FADE books) reacts to the live bias.
+          // Self-guarded; never throws into the poll loop.
+          autoPaperTick({
+            ts: latest.ts,
+            tsIST: fmtIST(),
+            day: curDay,
+            spot: curSpot,
+            atm: state.atm,
+            bias: r.ready ? r.bias : null,
+            net: r.net ?? null,
+            strength: r.strength ?? null,
+            byStrike,
+          });
         } catch (e) {
           // Swallow transient poll errors; loop continues.
         }
 
-        for (let i = 0; i < QUOTE_POLL_SEC && state.status === "running"; i++) {
+        for (let i = 0; i < POLL_SEC && state.status === "running"; i++) {
           await new Promise(r => setTimeout(r, 1000));
+
+          // Fast LTP-only refresh (~1s) so the UI's live premium / MTM on open
+          // paper trades doesn't sit frozen between the 30s OI ticks. Fetches
+          // only the open legs' option tokens (+ index) — a tiny batched request
+          // — and updates the display mark. Runs NO exit/entry logic, so trade
+          // behavior stays on the slow cadence above. Self-guarded.
+          try {
+            const legs = openTradeLegs();
+            if (legs.length) {
+              const want = new Set(legs.map(l => `${l.strike}${l.optType}`));
+              const legToks = optTokens.filter(t => want.has(`${t.strike}${t.side}`));
+              const fastTokens = [
+                { exchange: niftyIdx.exchange, token: niftyIdx.token, symbol: "NIFTY50" },
+                ...legToks.map(t => ({ exchange: t.exchange, token: t.token, symbol: t.symbol })),
+              ];
+              const fq = await fetchQuotes(jwtToken, apiKey, fastTokens);
+              const fByStrike = {};
+              for (const t of legToks) {
+                const row = fq[t.symbol];
+                if (!row) continue;
+                if (!fByStrike[t.strike]) fByStrike[t.strike] = { ce: null, pe: null };
+                const cell = { ltp: row.ltp ?? null };
+                if (t.side === "CE") fByStrike[t.strike].ce = cell;
+                else                 fByStrike[t.strike].pe = cell;
+              }
+              refreshOpenMarks({
+                ts: Date.now(),
+                tsIST: fmtIST(),
+                spot: fq.NIFTY50?.ltp ?? state.ohlc?.ltp ?? state.atm,
+                byStrike: fByStrike,
+              });
+            }
+          } catch {
+            // Transient fast-poll error — ignore; next OI tick still refreshes.
+          }
         }
       }
 

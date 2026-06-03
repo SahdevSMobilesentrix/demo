@@ -205,23 +205,30 @@ function tryOpen(state, book, sigDir, bias, net, tick) {
   });
 }
 
+// Refresh an open trade's live mark-to-market (premium / MTM) from the latest
+// LTP. Pure display update — no exit logic. Returns { curLtp, exitPrem } (or
+// null when no fresh LTP) so callers that also run exits can reuse the values.
+function markOpen(open, cfg, tick) {
+  const curLtp = optLtp(tick.byStrike, open.atmStrike, open.optType);
+  if (curLtp == null) return null;
+  const qty = open.lotSize * open.lots;
+  const exitPrem = round2(curLtp * (1 - cfg.slippagePct / 100));
+  const gross = (exitPrem - open.entry.premium) * qty;
+  const exitCost = computeLegCosts(exitPrem, qty, "SELL").total;
+  open.mark = {
+    ts: tick.ts, tsIST: tick.tsIST, premium: round2(curLtp), exitPrem,
+    spot: round2(tick.spot), mtmNet: round2(gross - open.entry.costs - exitCost),
+  };
+  return { curLtp, exitPrem };
+}
+
 function tryMonitor(state, book, tick) {
   const open = bookOpen(state.trades, book);
   if (!open) return;
   const cfg = state.config;
-  const qty = open.lotSize * open.lots;
-  const curLtp = optLtp(tick.byStrike, open.atmStrike, open.optType);
-  const exitPrem = curLtp != null ? round2(curLtp * (1 - cfg.slippagePct / 100)) : null;
-
-  // live mark-to-market for the UI
-  if (exitPrem != null) {
-    const gross = (exitPrem - open.entry.premium) * qty;
-    const exitCost = computeLegCosts(exitPrem, qty, "SELL").total;
-    open.mark = {
-      ts: tick.ts, tsIST: tick.tsIST, premium: round2(curLtp), exitPrem,
-      spot: round2(tick.spot), mtmNet: round2(gross - open.entry.costs - exitCost),
-    };
-  }
+  const m = markOpen(open, cfg, tick);
+  const curLtp = m?.curLtp ?? null;
+  const exitPrem = m?.exitPrem ?? null;
 
   const ms = getMarketStatus();
   const confDir = confirmedDir(cfg);
@@ -257,6 +264,47 @@ function closeBookTrade(state, open, reason, curLtp, tick) {
   open.netPnl = net;
   // bookCapital sums CLOSED netPnl, which now includes this trade.
   open.capitalAfter = bookCapital(state.trades, open.book, cfg.initialCapital);
+}
+
+// ---------------- public: fast LTP-only refresh (display only) ----------------
+
+/**
+ * The option legs currently open across both books, so the caller (oiRunner)
+ * knows which quote tokens to fetch on the fast 1s tick. Returns [] when flat.
+ * @returns {Array<{strike:number, optType:string}>}
+ */
+export function openTradeLegs() {
+  const state = loadState();
+  const legs = [];
+  for (const book of BOOKS) {
+    const open = bookOpen(state.trades, book);
+    if (open) legs.push({ strike: open.atmStrike, optType: open.optType });
+  }
+  return legs;
+}
+
+/**
+ * Refresh the live premium / MTM on open trades from fresh LTPs so the UI
+ * updates every second. Deliberately runs NO exit or entry logic — TARGET /
+ * STOP / REVERSAL / SQUAREOFF exits stay on the slower onOiTick cadence, so
+ * trade behavior and results are unchanged. Self-guarded; never throws.
+ *
+ * @param {object} tick  ts(ms), tsIST(string), spot, byStrike
+ */
+export function refreshOpenMarks(tick) {
+  try {
+    const state = loadState();
+    const cfg = state.config;
+    let touched = false;
+    for (const book of BOOKS) {
+      const open = bookOpen(state.trades, book);
+      if (!open) continue;
+      if (markOpen(open, cfg, tick)) touched = true;
+    }
+    if (touched) saveState(state); // skip pointless writes when both books are flat
+  } catch {
+    // Never let a paper-trade bug disturb the OI poll loop.
+  }
 }
 
 // ---------------- public: called every OI poll from oiRunner ----------------
@@ -299,31 +347,6 @@ export function onOiTick(tick) {
     }
 
     saveState(state);
-  } catch {
-    // Never let a paper-trade bug disturb the OI poll loop.
-  }
-}
-
-/**
- * Lightweight refresh between full OI ticks. Re-marks open trades against the
- * latest option LTPs (so the UI's live premium / MTM updates every couple of
- * seconds instead of once per 30s OI poll) and fires prompt price/time exits
- * (TARGET / STOP / SQUAREOFF / MARKET_CLOSE). Deliberately does NOT touch the
- * signal-confirmation tracker or open new trades — those stay on the slower
- * bias cadence in onOiTick.
- *
- * @param {object} tick  ts(ms), tsIST(string), spot, atm, byStrike
- */
-export function markOpenTrades(tick) {
-  try {
-    const state = loadState();
-    let touched = false;
-    for (const book of BOOKS) {
-      if (!bookOpen(state.trades, book)) continue;
-      tryMonitor(state, book, tick);
-      touched = true;
-    }
-    if (touched) saveState(state); // skip pointless writes when both books are flat
   } catch {
     // Never let a paper-trade bug disturb the OI poll loop.
   }
